@@ -1,0 +1,8 @@
+[package]
+name = "pico-verifier"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+pico-sdk = { workspace = true }
+aws-nitro-enclave-attestation-verifier = { workspace = true }

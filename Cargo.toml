@@ -10,7 +10,9 @@ members = [
     "crates/risc0-methods/risc0-aggregator",
     "crates/sp1-methods",
     "crates/sp1-methods/sp1-verifier",
-    "crates/sp1-methods/sp1-aggregator"
+    "crates/sp1-methods/sp1-aggregator", 
+    "crates/pico-methods",
+    "crates/pico-methods/pico-verifier"
 ]
 default-members = [
     "crates/nitro-attest-cli",
@@ -58,6 +60,9 @@ risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", ta
 
 sp1-zkvm = "5.2.1"
 sp1-sdk = { version = "5.2.1", default-features = false, features = ["network"] }
+
+pico-sdk = { git = "https://github.com/brevis-network/pico", tag = "v1.1.6" }
+
 alloy-primitives = { version = "1.2" }
 tokio = { version = "1.35", features = ["full"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
