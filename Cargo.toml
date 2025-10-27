@@ -12,7 +12,8 @@ members = [
     "crates/sp1-methods/sp1-verifier",
     "crates/sp1-methods/sp1-aggregator", 
     "crates/pico-methods",
-    "crates/pico-methods/pico-verifier"
+    "crates/pico-methods/pico-verifier",
+    "crates/pico-methods/pico-aggregator"
 ]
 default-members = [
     "crates/nitro-attest-cli",
