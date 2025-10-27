@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {Ownable} from "@solady/auth/Ownable.sol";
 import {ISP1Verifier} from "@sp1-contracts/ISP1Verifier.sol";
 import {IRiscZeroVerifier} from "@risc0-ethereum/IRiscZeroVerifier.sol";
+import {IPicoVerifier} from "./interfaces/IPicoVerifier.sol";
 import {
     INitroEnclaveVerifier,
     ZkCoProcessorType,
@@ -12,7 +13,6 @@ import {
     BatchVerifierJournal,
     VerificationResult
 } from "./interfaces/INitroEnclaveVerifier.sol";
-import {console} from "forge-std/console.sol";
 
 /**
  * @title NitroEnclaveVerifier
@@ -276,6 +276,12 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
             IRiscZeroVerifier(zkVerifier).verify(proofBytes, programId, sha256(output));
         } else if (zkCoprocessor == ZkCoProcessorType.Succinct) {
             ISP1Verifier(zkVerifier).verifyProof(programId, output, proofBytes);
+        } else if (zkCoprocessor == ZkCoProcessorType.Pico) {
+            IPicoVerifier(zkVerifier).verifyPicoProof(
+                programId,
+                output,
+                abi.decode(proofBytes, (uint256[8]))
+            );
         } else {
             revert Unknown_Zk_Coprocessor();
         }

@@ -10,7 +10,9 @@ enum ZkCoProcessorType {
     // RISC Zero zkVM proving system
     RiscZero, 
     // Succinct SP1 proving system
-    Succinct
+    Succinct,
+    // Pico zkVM proving system
+    Pico
 }
 
 /**
