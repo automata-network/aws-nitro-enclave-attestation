@@ -44,6 +44,7 @@ aws-nitro-enclave-attestation-prover = { path = "crates/prover", default-feature
 x509-verifier-rust-crypto = { path = "crates/x509-verifier-rust-crypto" }
 risc0-methods = { path = "crates/risc0-methods" }
 sp1-methods = { path = "crates/sp1-methods" }
+pico-methods = { path = "crates/pico-methods" }
 
 clap = { version = "4.0", features = ["derive", "env"] }
 anyhow = { version = "1", features = ["backtrace"] }
