@@ -9,7 +9,7 @@ license.workspace = true
 default = ["risc0", "sp1"]
 sp1 = ["dep:sp1-sdk", "dep:sp1-methods"]
 risc0 = ["dep:risc0-zkvm", "dep:risc0-methods", "dep:bonsai-sdk"]
-pico = ["dep:pico-sdk", "dep:pico-methods"]
+pico = ["dep:pico-sdk", "dep:pico-vm", "dep:pico-methods"]
 
 [dependencies]
 anyhow.workspace = true
@@ -21,6 +21,7 @@ sp1-methods = { workspace = true, optional = true }
 sp1-sdk = { workspace = true, optional = true }
 pico-methods = { workspace = true, optional = true }
 pico-sdk = { workspace = true, optional = true }
+pico-vm = { workspace = true, optional = true }
 alloy-primitives.workspace = true
 bonsai-sdk = { workspace = true, optional = true }
 tokio.workspace = true

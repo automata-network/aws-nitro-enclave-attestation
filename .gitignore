@@ -21,3 +21,6 @@ target
 #.idea/
 .DS_Store
 /contracts/broadcast/*
+
+# Pico EVM proof artifacts (contains trusted setup keys and proofs)
+evm_proof_artifacts/

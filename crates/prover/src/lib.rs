@@ -17,6 +17,11 @@ pub mod program_risc0;
 #[cfg(feature = "risc0")]
 pub use program_risc0::{ProgramRisc0, RiscZeroProverConfig};
 
+#[cfg(feature = "pico")]
+pub mod program_pico;
+#[cfg(feature = "pico")]
+pub use program_pico::{ProgramPico, PicoProverConfig};
+
 pub fn set_prover_dev_mode(_dev_mode: bool) {
     #[cfg(feature = "sp1")]
     if _dev_mode {

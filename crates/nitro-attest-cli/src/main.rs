@@ -1,7 +1,7 @@
 //! # Nitro Attestation CLI
 //!
 //! A command-line interface for generating and verifying AWS Nitro Enclave attestation proofs
-//! using zero-knowledge proof systems (RISC0 and SP1).
+//! using zero-knowledge proof systems (RISC0, SP1, and Pico).
 //!
 //! This CLI provides functionality to:
 //! - Generate ZK proofs for Nitro Enclave attestation reports
@@ -15,6 +15,7 @@
 //! Generate a proof from an attestation report:
 //! ```bash
 //! nitro-attest-cli prove --report attestation.report --sp1 --out proof.json
+//! # or use --risc0 or --pico
 //! ```
 //!
 //! Verify a proof on-chain:

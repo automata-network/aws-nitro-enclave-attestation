@@ -1312,6 +1312,7 @@ dependencies = [
  "log",
  "pico-methods",
  "pico-sdk",
+ "pico-vm",
  "risc0-ethereum-contracts",
  "risc0-methods",
  "risc0-zkvm",

@@ -11,8 +11,8 @@ use aws_nitro_enclave_attestation_prover::{
 use clap::Args;
 
 /// Command-line arguments for configuring zero-knowledge proof system settings.
-/// 
-/// Supports both RISC0 and SP1 proof systems with their respective configuration options.
+///
+/// Supports RISC0, SP1, and Pico proof systems with their respective configuration options.
 /// Only one prover type should be specified at a time.
 #[derive(Args, Clone)]
 pub struct ProverArgs {
@@ -25,6 +25,11 @@ pub struct ProverArgs {
     /// Use the SP1 zkVM for proof generation
     #[arg(long)]
     pub sp1: bool,
+
+    #[cfg(feature = "pico")]
+    /// Use the Pico zkVM for proof generation
+    #[arg(long)]
+    pub pico: bool,
 
     /// Enable development mode for mock proof generation
     #[arg(long, default_value = "false", env = "DEV_MODE")]
@@ -50,10 +55,21 @@ pub struct ProverArgs {
 impl ProverArgs {
     /// Creates a prover configuration based on the specified arguments.
     pub fn prover_config(&self) -> anyhow::Result<ProverConfig> {
-        #[cfg(all(feature = "sp1", feature = "risc0"))]
-        if self.sp1 && self.risc0 {
+        // Check for mutual exclusion of prover options
+        let prover_count = {
+            let mut count = 0;
+            #[cfg(feature = "risc0")]
+            if self.risc0 { count += 1; }
+            #[cfg(feature = "sp1")]
+            if self.sp1 { count += 1; }
+            #[cfg(feature = "pico")]
+            if self.pico { count += 1; }
+            count
+        };
+
+        if prover_count > 1 {
             return Err(anyhow!(
-                "Cannot use both --sp1 and --risc0 at the same time."
+                "Cannot use multiple provers at the same time. Choose only one: --risc0, --sp1, or --pico"
             ));
         }
 
@@ -75,7 +91,13 @@ impl ProverArgs {
             }));
         }
 
-        bail!("No prover specified. Use --risc0 or --sp1 to select a proof system.");
+        #[cfg(feature = "pico")]
+        if self.pico {
+            use aws_nitro_enclave_attestation_prover::PicoProverConfig;
+            return Ok(ProverConfig::pico_with(PicoProverConfig::default()));
+        }
+
+        bail!("No prover specified. Use --risc0, --sp1, or --pico to select a proof system.");
     }
 
     /// Creates a new `NitroEnclaveProver` instance with the configured settings.
