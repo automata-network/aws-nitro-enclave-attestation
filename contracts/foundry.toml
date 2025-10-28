@@ -15,4 +15,9 @@ remappings = [
 ]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
-fs_permissions = [{ access = "read", path = "../samples"}, { access = "readwrite", path = "deployments" }, { access = "read", path = "deploy-config.json" }]
+fs_permissions = [
+    { access = "read", path = "../samples"}, 
+    { access = "readwrite", path = "deployments" }, 
+    { access = "read", path = "deploy-config.json" },
+    { access = "read", path = "test/assets" }
+]

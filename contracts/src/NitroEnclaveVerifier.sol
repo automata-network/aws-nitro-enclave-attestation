@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Ownable} from "@solady/auth/Ownable.sol";
 import {ISP1Verifier} from "@sp1-contracts/ISP1Verifier.sol";
 import {IRiscZeroVerifier} from "@risc0-ethereum/IRiscZeroVerifier.sol";
-import {IPicoVerifier} from "./interfaces/IPicoVerifier.sol";
+import {IPicoVerifier} from "./pico/IPicoVerifier.sol";
 import {
     INitroEnclaveVerifier,
     ZkCoProcessorType,
