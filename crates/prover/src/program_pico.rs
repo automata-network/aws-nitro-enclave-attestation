@@ -124,7 +124,6 @@ where
         let (proof, _) = proof.decode_proof::<(Vec<u8>, BaseVerifyingKey)>()?;
         // Decode the 8 * 32-byte proof elements
         let proof_elements: Vec<U256> = proof
-            .encoded_proof
             .chunks(32)
             .take(8)
             .map(|chunk| U256::from_be_slice(chunk))
