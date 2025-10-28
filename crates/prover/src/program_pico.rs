@@ -88,8 +88,8 @@ impl<Input, Output> ProgramPico<Input, Output> {
                 // Prove with EVM backend (KoalaBear)
                 client.prove_evm(stdin_builder, need_setup, &output_path, "kb")?;
 
-                // Read proof.json - first 8 elements of 32-byte values
-                let proof_file = output_path.join("proof.json");
+                // Read proof.data - first 8 elements of 32-byte values
+                let proof_file = output_path.join("proof.data");
                 let proof_data: Vec<String> = serde_json::from_reader(File::open(proof_file)?)?;
                 let proof_bytes: Vec<u8> = proof_data[..8]
                     .iter()
