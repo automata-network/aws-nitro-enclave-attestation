@@ -1310,6 +1310,7 @@ dependencies = [
  "crossbeam",
  "lazy_static",
  "log",
+ "p3-field 0.1.0",
  "pico-methods",
  "pico-sdk",
  "pico-vm",

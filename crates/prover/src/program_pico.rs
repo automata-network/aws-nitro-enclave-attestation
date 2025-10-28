@@ -2,7 +2,7 @@ use std::fs::{self, File};
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
-use alloy_primitives::{Bytes, B256, U256};
+use alloy_primitives::{hex, Bytes, B256, U256};
 use alloy_sol_types::SolValue;
 use anyhow::anyhow;
 use aws_nitro_enclave_attestation_verifier::stub::{
@@ -10,10 +10,15 @@ use aws_nitro_enclave_attestation_verifier::stub::{
 };
 use lazy_static::lazy_static;
 use pico_methods::{PICO_AGGREGATOR_ELF, PICO_VERIFIER_ELF};
-use pico_sdk::{client::KoalaBearProverClient, HashableKey, StdinBuilder};
-use pico_vm::machine::{
-    keys::BaseVerifyingKey,
-    proof::MetaProof
+use p3_field::PrimeField;
+use pico_sdk::{client::KoalaBearProverClient, HashableKey};
+use pico_vm::{
+    configs::stark_config::KoalaBearPoseidon2,
+    machine::{
+        keys::BaseVerifyingKey,
+        proof::MetaProof,
+    },
+    emulator::stdin::EmulatorStdinBuilder,
 };
 
 use crate::{
@@ -55,7 +60,7 @@ impl<Input, Output> ProgramPico<Input, Output> {
 
     pub fn gen_raw_proof(
         &self,
-        mut stdin_builder: StdinBuilder,
+        stdin_builder: EmulatorStdinBuilder<Vec<u8>, KoalaBearPoseidon2>,
         raw_proof_type: RawProofType,
     ) -> anyhow::Result<RawProof> {
         let client = KoalaBearProverClient::new(self.elf);
@@ -96,7 +101,7 @@ impl<Input, Output> ProgramPico<Input, Output> {
 
                 // Get journal from public values file
                 let pv_file = output_path.join("pv_file");
-                let journal = hex::decode(fs::read_to_string(pv_file)?)?;
+                let journal: Bytes = hex::decode(fs::read_to_string(pv_file)?)?.into();
 
                 RawProof::from_proof(&(proof_bytes, vk), journal)
             }
@@ -121,7 +126,7 @@ where
     }
 
     fn onchain_proof(&self, proof: &RawProof) -> anyhow::Result<Bytes> {
-        let (proof, _) = proof.decode_proof::<(Vec<u8>, BaseVerifyingKey)>()?;
+        let (proof, _) = proof.decode_proof::<(Vec<u8>, BaseVerifyingKey<KoalaBearPoseidon2>)>()?;
         // Decode the 8 * 32-byte proof elements
         let proof_elements: Vec<U256> = proof
             .chunks(32)
@@ -130,12 +135,8 @@ where
             .collect();
 
         // ABI encode as uint256[8]
-        use alloy_sol_types::sol;
-        sol! {
-            type ProofArray = uint256[8];
-        }
-
-        Ok(ProofArray::abi_encode(&proof_elements).into())
+        let proof_array: [U256; 8] = proof_elements.try_into().map_err(|_| anyhow!("Expected exactly 8 proof elements"))?;
+        Ok(proof_array.abi_encode().into())
     }
 
     fn upload_image(&self, _cfg: &RemoteProverConfig) -> anyhow::Result<()> {
@@ -169,12 +170,12 @@ where
         let mut stdin_builder = client.new_stdin_builder();
 
         // Write input
-        stdin_builder.write_vec(input.abi_encode());
+        stdin_builder.write_slice(&input.abi_encode());
 
         // Handle composite proof assumptions for aggregation
         if let Some(encoded_composite_proofs) = encoded_composite_proofs {
             for proof_bytes in encoded_composite_proofs {
-                let (combine_proof, vk) = bincode::deserialize::<(MetaProof, BaseVerifyingKey)>(&proof_bytes)?;
+                let (combine_proof, vk) = bincode::deserialize::<(MetaProof<KoalaBearPoseidon2>, BaseVerifyingKey<KoalaBearPoseidon2>)>(&proof_bytes)?;
                 stdin_builder.write_pico_proof(combine_proof, vk);
             }
         }
