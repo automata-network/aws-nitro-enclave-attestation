@@ -39,4 +39,11 @@ pub fn set_prover_dev_mode(_dev_mode: bool) {
         std::env::set_var("RISC0_PROVER", "bonsai");
         std::env::set_var("RISC0_DEV_MODE", "0");
     }
+
+    #[cfg(feature = "pico")]
+    if _dev_mode {
+        std::env::set_var("PICO_DEV_MODE", "1");
+    } else {
+        std::env::set_var("PICO_DEV_MODE", "0");
+    }
 }
