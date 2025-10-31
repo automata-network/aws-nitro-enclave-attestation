@@ -89,7 +89,7 @@ impl<Input, Output> ProgramPico<Input, Output> {
                     let need_setup = !vm_pk_path.exists();
 
                     // Prove with EVM backend (KoalaBear)
-                    client.prove_evm(stdin_builder, need_setup, &output_path, "kb")?;
+                    client.prove_evm_with_deferred(stdin_builder, need_setup, &output_path, "kb")?;
 
                     // Read proof.data - first 8 elements of 32-byte values
                     let proof_file = output_path.join("proof.data");

@@ -63,8 +63,8 @@ risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", ta
 sp1-zkvm = "5.2.1"
 sp1-sdk = { version = "5.2.1", default-features = false, features = ["network"] }
 
-pico-sdk = { git = "https://github.com/brevis-network/pico", tag = "v1.1.6" }
-pico-vm = { git = "https://github.com/brevis-network/pico", tag = "v1.1.6" }
+pico-sdk = { git = "https://github.com/automata-network/pico.git", branch = "evm_defer_proof" }
+pico-vm = { git = "https://github.com/automata-network/pico.git", branch = "evm_defer_proof" }
 
 alloy-primitives = { version = "1.2" }
 tokio = { version = "1.35", features = ["full"] }
