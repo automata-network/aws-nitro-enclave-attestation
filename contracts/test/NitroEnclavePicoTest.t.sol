@@ -15,15 +15,13 @@ contract NitroEnclavePicoTest is Test {
     PicoVerifier picoVerifier;
     address admin = address(0x01);
     string picoInputJson = vm.readFile(string.concat(vm.projectRoot(), "/test/assets/inputs.json"));
+    string picoAggregatedInputJson = vm.readFile(string.concat(vm.projectRoot(), "/test/assets/inputs-aggregated.json"));
 
     function setUp() public {
-        // prevent InvalidTimestamp errors
-        vm.warp(1723799509);
-        
         vm.startPrank(admin);
 
         // deploy contracts
-        verifier = new NitroEnclaveVerifier(admin, 3600 * 3, new bytes32[](0));
+        verifier = new NitroEnclaveVerifier(admin, 27900202, new bytes32[](0));
         picoVerifier = new PicoVerifier();
 
         // add root certificate
@@ -31,11 +29,12 @@ contract NitroEnclavePicoTest is Test {
         verifier.setRootCert(sha256(awsRoot));
 
         // configure Pico zkVerifier
-        bytes32 nitroPicoVkey = abi.decode(vm.parseJson(picoInputJson, ".riscvVKey"), (bytes32));
+        bytes32 nitroPicoVerifierVkey = abi.decode(vm.parseJson(picoInputJson, ".riscvVKey"), (bytes32));
+        bytes32 nitroPicoAggregatorVkey = abi.decode(vm.parseJson(picoAggregatedInputJson, ".riscvVKey"), (bytes32));
         ZkCoProcessorConfig memory picoConfig = ZkCoProcessorConfig({
-            verifierId: nitroPicoVkey,
-            verifierProofId: bytes32(0),
-            aggregatorId: bytes32(0),
+            verifierId: nitroPicoVerifierVkey,
+            verifierProofId: 0x38a3d34f08d8af64b947e861eb80b8404affdf756add5f577e79931598ba585a, // not in the input.json but you can get this from OnchainProof returned by the CLI
+            aggregatorId: nitroPicoAggregatorVkey,
             zkVerifier: address(picoVerifier)
         });
         verifier.setZkConfiguration(ZkCoProcessorType.Pico, picoConfig);
@@ -44,16 +43,45 @@ contract NitroEnclavePicoTest is Test {
     }
 
     function testVerifyNitroPicoProof() public {
-        bytes memory publicValues = abi.decode(vm.parseJson(picoInputJson, ".publicValues"), (bytes));
-        bytes32[] memory proofBytes32 = abi.decode(vm.parseJson(picoInputJson, ".proof"), (bytes32[]));
+        // prevent InvalidTimestamp errors
+        vm.warp(1723799509);
 
-        uint256[8] memory proofArray;
-        for (uint256 i = 0; i < 8; i++) {
-            proofArray[i] = uint256(proofBytes32[i]);
-        }
+        (, bytes memory publicValues, uint256[8] memory proofArray) = _parsePicoInput(picoInputJson);
 
         VerifierJournal memory journal = verifier.verify(publicValues, ZkCoProcessorType.Pico, abi.encode(proofArray));
 
         assertEq(uint8(journal.result), uint8(0));
+    }
+
+    function testBatchVerifyNitroPicoProof() public {
+        // prevent InvalidTimestamp errors
+        vm.warp(1723799509);
+
+        (, bytes memory publicValues, uint256[8] memory proofArray) = _parsePicoInput(picoAggregatedInputJson);
+
+        VerifierJournal[] memory journals = verifier.batchVerify(
+            publicValues,
+            ZkCoProcessorType.Pico,
+            abi.encode(proofArray)
+        );
+
+        uint256 n = journals.length;
+        for (uint256 i = 0; i < n; i++) {
+            assertEq(uint8(journals[i].result), uint8(0));
+        }
+    }
+
+    function _parsePicoInput(string memory json) private pure returns (
+        bytes32 riscvVKey,
+        bytes memory publicValues,
+        uint256[8] memory proofArray
+    ) {
+        riscvVKey = abi.decode(vm.parseJson(json, ".riscvVKey"), (bytes32));
+        publicValues = abi.decode(vm.parseJson(json, ".publicValues"), (bytes));
+
+        bytes32[] memory proofBytes32 = abi.decode(vm.parseJson(json, ".proof"), (bytes32[]));
+        for (uint256 i = 0; i < 8; i++) {
+            proofArray[i] = uint256(proofBytes32[i]);
+        }
     }
 }
