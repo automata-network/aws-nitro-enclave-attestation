@@ -56,8 +56,8 @@ bonsai-sdk = { version = "1.4.0", features = ["non_blocking"] }
 risc0-build = { version = "=2.2.0" }
 risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.2.1" }
 
-sp1-zkvm = "5.2.1"
-sp1-sdk = { version = "5.2.1", default-features = false, features = ["network"] }
+sp1-zkvm = "^5.0.0"
+sp1-sdk = { version = "^5.0.0", default-features = false, features = ["network"] }
 alloy-primitives = { version = "1.2" }
 tokio = { version = "1.35", features = ["full"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
