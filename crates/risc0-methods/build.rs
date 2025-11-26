@@ -46,9 +46,9 @@ fn main() {
     let target_base = manifest_dir.join("../../target");
 
     for name in [RISC0_VERIFIER, RISC0_AGGREGATOR] {
-        // Path: target/riscv-guest/risc0-methods/{elf-name}/riscv32im-risc0-zkvm-elf/{profile}/{elf-name}
+        // Path: target/riscv-guest/risc0-methods/{elf-name}/riscv32im-risc0-zkvm-elf/{profile}/{elf-name}.bin
         let src = target_base.join(format!(
-            "riscv-guest/risc0-methods/{}/riscv32im-risc0-zkvm-elf/{}/{}",
+            "riscv-guest/risc0-methods/{}/riscv32im-risc0-zkvm-elf/{}/{}.bin",
             name, profile, name
         ));
         let dst = elf_dir.join(format!("{}-elf", name));
