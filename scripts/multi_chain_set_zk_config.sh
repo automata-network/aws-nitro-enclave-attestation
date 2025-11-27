@@ -57,8 +57,8 @@ list_chains() {
     chains=$(jq -r '.chains | keys[]' deploy-config.json)
 
     for chain in $chains; do
-        chain_id=$(jq -r ".chains.${chain}.chainId" deploy-config.json)
-        rpc=$(jq -r ".chains.${chain}.rpc" deploy-config.json)
+        chain_id=$(jq -r ".chains[\"${chain}\"].chainId" deploy-config.json)
+        rpc=$(jq -r ".chains[\"${chain}\"].rpc" deploy-config.json)
         echo "  - $chain (Chain ID: $chain_id)"
         echo "    RPC: $rpc"
     done
@@ -134,10 +134,11 @@ update_on_chain() {
 
     local cmd="forge script script/MultiChainSetZkConfig.s.sol:MultiChainSetZkConfigScript \
         --sig '${func_name}(string)' \
-        '$chain_name'"
+        '$chain_name' \
+        --private-key $PRIVATE_KEY"
 
     if [ "$dry_run" != "true" ]; then
-        cmd="$cmd --broadcast --private-key $PRIVATE_KEY"
+        cmd="$cmd --broadcast"
     fi
 
     eval $cmd
@@ -177,10 +178,10 @@ update_on_all_chains() {
     local func_name=$(get_function_name "$zk_type" "all")
 
     local cmd="forge script script/MultiChainSetZkConfig.s.sol:MultiChainSetZkConfigScript \
-        --sig '${func_name}()'"
+        --sig '${func_name}()' --private-key $PRIVATE_KEY"
 
     if [ "$dry_run" != "true" ]; then
-        cmd="$cmd --broadcast --private-key $PRIVATE_KEY"
+        cmd="$cmd --broadcast"
     fi
 
     eval $cmd

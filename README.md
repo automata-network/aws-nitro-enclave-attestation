@@ -61,7 +61,7 @@ A comprehensive SDK for AWS Nitro Enclave attestation verification that generate
 
 | ZkType | Verifier ID | Verifier Proof ID | Aggregator ID |
 | ------ | ----------- | ----------------- | ------------- |
-| Risc0  | 0xb01c0174aed6bd02aecec2671739e004503f6482f4e7298e71129f9e0aea309e | 0xb01c0174aed6bd02aecec2671739e004503f6482f4e7298e71129f9e0aea309e | 0xb5bb99768a18b5ba530ef4f7c13fc8f5130c1ed20db8190d11d8ab1f5f4d9dc5 |
+| Risc0  | 0x9d3db93f237fb35261e1d67b1253cdbdada02f80d038968f6340357d4fcc82c6 | 0x9d3db93f237fb35261e1d67b1253cdbdada02f80d038968f6340357d4fcc82c6 | 0xb087de2eb814b682e81a69d9b8d5d2bb215a29f71755a1672d818104cddf3d42 |
 | SP1    | 0x00326cc10dc6dbcf4249c7adb4d515b9bdbff20f541da85921fc9ddf930e7bb0 | 0x86603619d0f3b671b6f538499b5b514d7a90ff6d64a17650bf3bf943b07b0e13 | 0x00ed49951c84f8af646740f7fe6353b1dd274aea8dc108720ef0727b2bcfca1b |
 
 ## Generating Attestation Reports
