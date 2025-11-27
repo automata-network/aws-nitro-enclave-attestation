@@ -21,9 +21,9 @@ use crate::{
 
 lazy_static! {
     pub static ref RISC0_PROGRAM_VERIFIER: ProgramRisc0<VerifierInput, VerifierJournal> =
-        ProgramRisc0::new(RISC0_VERIFIER_ELF, RISC0_VERIFIER_ID);
+        ProgramRisc0::new(RISC0_VERIFIER_ELF, *RISC0_VERIFIER_ID);
     pub static ref RISC0_PROGRAM_AGGREGATOR: ProgramRisc0<BatchVerifierInput, BatchVerifierJournal> =
-        ProgramRisc0::new(RISC0_AGGREGATOR_ELF, RISC0_AGGREGATOR_ID);
+        ProgramRisc0::new(RISC0_AGGREGATOR_ELF, *RISC0_AGGREGATOR_ID);
 }
 
 #[derive(Debug, Clone)]
