@@ -3,8 +3,12 @@ name = "risc0-methods"
 version = "0.1.0"
 edition = "2021"
 
+[dependencies]
+lazy_static = { workspace = true }
+risc0-zkvm = { workspace = true }
+
 [build-dependencies]
-risc0-build.workspace = true
+risc0-build = { version = "^3.0.3" }
 
 [package.metadata.risc0]
 methods = ["risc0-verifier", "risc0-aggregator"]

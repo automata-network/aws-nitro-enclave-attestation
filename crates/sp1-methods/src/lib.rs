@@ -1,8 +1,8 @@
 use lazy_static::lazy_static;
-use sp1_sdk::{include_elf, EnvProver, SP1ProvingKey, SP1VerifyingKey};
+use sp1_sdk::{EnvProver, SP1ProvingKey, SP1VerifyingKey};
 
-pub const SP1_VERIFIER_ELF: &[u8] = include_elf!("sp1-verifier");
-pub const SP1_AGGREGATOR_ELF: &[u8] = include_elf!("sp1-aggregator");
+pub const SP1_VERIFIER_ELF: &[u8] = include_bytes!(".././elf/sp1-verifier-elf");
+pub const SP1_AGGREGATOR_ELF: &[u8] = include_bytes!(".././elf/sp1-aggregator-elf");
 
 lazy_static! {
     pub static ref ENV_PROVER: EnvProver = EnvProver::new();

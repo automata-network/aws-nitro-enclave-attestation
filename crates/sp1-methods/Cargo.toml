@@ -8,4 +8,4 @@ sp1-sdk.workspace = true
 lazy_static.workspace = true
 
 [build-dependencies]
-sp1-build = "5.2.1"
+sp1-build = "^5.0.0"

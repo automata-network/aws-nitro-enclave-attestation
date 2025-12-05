@@ -169,6 +169,15 @@ contract NitroEnclaveVerifierScript is Script {
         bytes32 aggregatorId = vm.parseJsonBytes32(proofJson, ".program_id.aggregator_id");
         string memory zktype = vm.parseJsonString(proofJson, ".zktype");
         ZkCoProcessorType zkType = _getZkType(zktype);
+
+        console.log("Setting zk verifier for: ", zktype);
+        console.log("Verifier ID: ");
+        console.logBytes32(verifierId);
+        console.log("Verifier Proof ID: ");
+        console.logBytes32(verifierProofId);
+        console.log("Aggregator ID: ");
+        console.logBytes32(aggregatorId);
+
         ZkCoProcessorConfig memory config = ZkCoProcessorConfig({
             verifierId: verifierId,
             verifierProofId: verifierProofId,

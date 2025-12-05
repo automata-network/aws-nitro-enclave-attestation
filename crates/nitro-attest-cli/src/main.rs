@@ -27,6 +27,7 @@ use clap::{Parser, Subcommand};
 use tracing_subscriber::{filter::LevelFilter, EnvFilter};
 
 mod debug;
+mod program_id;
 mod proof;
 mod prove;
 mod upload;
@@ -47,17 +48,20 @@ struct NitroAttestCli {
 enum Commands {
     /// Generate zero-knowledge proofs from Nitro Enclave attestation reports
     Prove(prove::ProveCli),
-    
+
     /// Proof-related operations (verification, aggregation, etc.)
     #[command(subcommand)]
     Proof(proof::ProofCli),
-    
+
     /// Upload ZK programs for remote execution
     Upload(upload::UploadCli),
-    
+
     /// Debug utilities for inspecting attestation reports
     #[command(subcommand)]
     Debug(debug::DebugCli),
+
+    /// Get the program IDs for the configured ZK prover
+    ProgramId(program_id::ProgramIdCli),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -75,6 +79,7 @@ fn main() -> anyhow::Result<()> {
         Commands::Debug(cli) => cli.run()?,
         Commands::Upload(cli) => cli.run()?,
         Commands::Proof(cli) => cli.run()?,
+        Commands::ProgramId(cli) => cli.run()?,
     }
     Ok(())
 }
