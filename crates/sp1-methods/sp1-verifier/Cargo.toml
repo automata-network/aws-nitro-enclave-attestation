@@ -8,7 +8,5 @@ license = "Apache-2.0"
 [workspace]
 
 [dependencies]
-alloy-sol-types = "1.0"
 sp1-zkvm = "^5.0.0"
 aws-nitro-enclave-attestation-verifier = { path = "../../verifier", features = ["sp1"] }
-alloy-primitives = "1.2"

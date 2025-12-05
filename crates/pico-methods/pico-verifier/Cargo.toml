@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-pico-sdk = { workspace = true }
-aws-nitro-enclave-attestation-verifier = { workspace = true, features = ["pico"] }
+pico-sdk = { git = "https://github.com/automata-network/pico.git", branch = "evm_defer_proof" }
+aws-nitro-enclave-attestation-verifier = { path = "../../verifier", features = ["pico"] }

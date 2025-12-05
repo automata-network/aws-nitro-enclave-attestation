@@ -10,5 +10,3 @@ license = "Apache-2.0"
 [dependencies]
 risc0-zkvm = { version = "^2.2.0", default-features = false, features = ["std"] }
 aws-nitro-enclave-attestation-verifier = { path = "../../verifier", features = ["risc0"] }
-hex = "0.4"
-alloy-primitives = "1.2"
