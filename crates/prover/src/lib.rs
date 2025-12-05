@@ -32,11 +32,8 @@ pub fn set_prover_dev_mode(_dev_mode: bool) {
 
     #[cfg(feature = "risc0")]
     if _dev_mode {
-        std::env::set_var("RISC0_PROVER", "");
         std::env::set_var("RISC0_DEV_MODE", "1");
-        std::env::set_var("RISC0_INFO", "1");
     } else {
-        std::env::set_var("RISC0_PROVER", "bonsai");
         std::env::set_var("RISC0_DEV_MODE", "0");
     }
 

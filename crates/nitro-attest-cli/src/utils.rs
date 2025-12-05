@@ -8,7 +8,17 @@ use anyhow::{anyhow, bail};
 use aws_nitro_enclave_attestation_prover::{
     NitroEnclaveProver, NitroEnclaveVerifierContract, ProverConfig,
 };
-use clap::Args;
+use clap::{Args, ValueEnum};
+
+/// Proof type for Boundless proving (CLI enum)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
+pub enum BoundlessProofTypeCli {
+    #[default]
+    #[value(name = "groth16")]
+    Groth16,
+    #[value(name = "merkle")]
+    Merkle,
+}
 
 /// Command-line arguments for configuring zero-knowledge proof system settings.
 ///
@@ -43,13 +53,37 @@ pub struct ProverArgs {
     #[arg(long)]
     pub sp1_rpc_url: Option<String>,
 
-    /// API URL for RISC0 Bonsai service
-    #[arg(long, env = "BONSAI_API_URL", default_value = "https://api.bonsai.xyz")]
-    pub risc0_api_url: Option<String>,
+    /// Boundless RPC URL for RISC0 proving
+    #[arg(long, env = "BOUNDLESS_RPC_URL")]
+    pub risc0_rpc_url: Option<String>,
 
-    /// API key for RISC0 Bonsai service authentication
-    #[arg(long, env = "BONSAI_API_KEY")]
-    pub risc0_api_key: Option<String>,
+    /// Boundless wallet private key (hex-encoded)
+    #[arg(long, env = "BOUNDLESS_PRIVATE_KEY")]
+    pub risc0_private_key: Option<String>,
+
+    /// Program URL for pre-uploaded ELF (optional)
+    #[arg(long, env = "BOUNDLESS_PROGRAM_URL")]
+    pub risc0_program_url: Option<String>,
+
+    /// Proof type for Boundless proving (groth16 or merkle)
+    #[arg(long, value_enum, default_value = "groth16")]
+    pub risc0_proof_type: BoundlessProofTypeCli,
+
+    /// Minimum price in wei per cycle
+    #[arg(long)]
+    pub risc0_min_price: Option<u128>,
+
+    /// Maximum price in wei per cycle
+    #[arg(long)]
+    pub risc0_max_price: Option<u128>,
+
+    /// Timeout in seconds
+    #[arg(long)]
+    pub risc0_timeout: Option<u32>,
+
+    /// Ramp-up period in seconds
+    #[arg(long)]
+    pub risc0_ramp_up_period: Option<u32>,
 }
 
 impl ProverArgs {
@@ -84,10 +118,24 @@ impl ProverArgs {
 
         #[cfg(feature = "risc0")]
         if self.risc0 {
-            use aws_nitro_enclave_attestation_prover::RiscZeroProverConfig;
+            use aws_nitro_enclave_attestation_prover::{
+                program_risc0::BoundlessProofType, RiscZeroProverConfig,
+            };
+
+            let proof_type = match self.risc0_proof_type {
+                BoundlessProofTypeCli::Merkle => BoundlessProofType::Merkle,
+                BoundlessProofTypeCli::Groth16 => BoundlessProofType::Groth16,
+            };
+
             return Ok(ProverConfig::risc0_with(RiscZeroProverConfig {
-                api_url: self.risc0_api_url.clone(),
-                api_key: self.risc0_api_key.clone(),
+                rpc_url: self.risc0_rpc_url.clone(),
+                private_key: self.risc0_private_key.clone(),
+                program_url: self.risc0_program_url.clone(),
+                proof_type,
+                min_price: self.risc0_min_price,
+                max_price: self.risc0_max_price,
+                timeout: self.risc0_timeout,
+                ramp_up_period: self.risc0_ramp_up_period,
             }));
         }
 

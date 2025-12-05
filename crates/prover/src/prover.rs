@@ -295,18 +295,25 @@ impl NitroEnclaveProver {
             #[cfg(feature = "risc0")]
             ProverSystemConfig::RiscZero(system_cfg) => {
                 use crate::program_risc0::{RISC0_PROGRAM_AGGREGATOR, RISC0_PROGRAM_VERIFIER};
-                if let Some(api_url) = &system_cfg.api_url {
-                    std::env::set_var("BONSAI_API_URL", api_url);
+
+                // Set Boundless environment variables
+                if let Some(rpc_url) = &system_cfg.rpc_url {
+                    std::env::set_var("BOUNDLESS_RPC_URL", rpc_url);
                 }
-                if let Some(api_key) = &system_cfg.api_key {
-                    std::env::set_var("BONSAI_API_KEY", api_key);
+                if let Some(private_key) = &system_cfg.private_key {
+                    std::env::set_var("BOUNDLESS_PRIVATE_KEY", private_key);
                 }
+                if let Some(program_url) = &system_cfg.program_url {
+                    std::env::set_var("BOUNDLESS_PROGRAM_URL", program_url);
+                }
+
                 NitroEnclaveProver {
                     contract,
-                    remote_prover_config: system_cfg
-                        .clone()
-                        .try_into()
-                        .map_err(|err| format!("{:?}", err)),
+                    // RISC0 uses storage_provider_from_env() for uploads, not RemoteProverConfig
+                    remote_prover_config: Ok(RemoteProverConfig {
+                        api_url: system_cfg.rpc_url.clone(),
+                        api_key: system_cfg.private_key.clone().unwrap_or_default(),
+                    }),
                     cfg,
                     verifier: Box::new(RISC0_PROGRAM_VERIFIER.clone()),
                     aggregator: Box::new(RISC0_PROGRAM_AGGREGATOR.clone()),
