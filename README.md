@@ -63,6 +63,17 @@ A comprehensive SDK for AWS Nitro Enclave attestation verification that generate
 | ------ | ----------- | ----------------- | ------------- |
 | Risc0  | 0x9d3db93f237fb35261e1d67b1253cdbdada02f80d038968f6340357d4fcc82c6 | 0x9d3db93f237fb35261e1d67b1253cdbdada02f80d038968f6340357d4fcc82c6 | 0xb087de2eb814b682e81a69d9b8d5d2bb215a29f71755a1672d818104cddf3d42 |
 | SP1    | 0x00326cc10dc6dbcf4249c7adb4d515b9bdbff20f541da85921fc9ddf930e7bb0 | 0x86603619d0f3b671b6f538499b5b514d7a90ff6d64a17650bf3bf943b07b0e13 | 0x00ed49951c84f8af646740f7fe6353b1dd274aea8dc108720ef0727b2bcfca1b |
+| Pico    | 0x009fa7467192bf60230f423dcc0b880ebebbffe955d7f75a8ac9bcbf5a58ba98 | 0x38a3d34f08d8af64b947e861eb80b8404affdf756add5f577e79931598ba585a | 0x00093dbf39d4986be382e062dcbf34d2bc8105637de89bdaaa588014a9c53e9b |
+
+> [!NOTE]
+>
+> Pico zkVM does not currently provide remote provers. For that reason, Pico integration is only available on local for testing purposes.
+>
+> We advise you use a machine that is equipped with at least 256GB of memory to run the prover.
+>
+> It took us hours to generate EVM proofs (over Koalabear Field) by running the zkVM on an [Azure NC40ads H100 v5](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/gpu-accelerated/ncadsh100v5-series?tabs=sizebasic) instance.
+>
+> Currently the Pico SDK does not support GPU proving, and we believe the proving speed will significantly improve after GPU support is enabled.
 
 ## Generating Attestation Reports
 
