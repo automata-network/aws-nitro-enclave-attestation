@@ -77,10 +77,18 @@ impl Default for RiscZeroProverConfig {
             private_key: std::env::var("BOUNDLESS_PRIVATE_KEY").ok(),
             program_url: std::env::var("BOUNDLESS_PROGRAM_URL").ok(),
             proof_type: BoundlessProofType::default(),
-            min_price: None,
-            max_price: None,
-            timeout: None,
-            ramp_up_period: None,
+            min_price: std::env::var("BOUNDLESS_MIN_PRICE")
+                .ok()
+                .and_then(|s| s.parse().ok()),
+            max_price: std::env::var("BOUNDLESS_MAX_PRICE")
+                .ok()
+                .and_then(|s| s.parse().ok()),
+            timeout: std::env::var("BOUNDLESS_TIMEOUT")
+                .ok()
+                .and_then(|s| s.parse().ok()),
+            ramp_up_period: std::env::var("BOUNDLESS_RAMP_UP_PERIOD")
+                .ok()
+                .and_then(|s| s.parse().ok()),
         }
     }
 }
@@ -201,14 +209,19 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
                 offer_builder.max_price(U256::from(max_price));
             }
             if let Some(timeout) = cfg.timeout {
-                offer_builder.timeout(timeout);
+                offer_builder.lock_timeout(timeout);
+
+                // 10 minutes after lock timeout
+                offer_builder.timeout(timeout + 600);
             }
             if let Some(ramp_up_period) = cfg.ramp_up_period {
                 offer_builder.ramp_up_period(ramp_up_period);
             }
             let collateral_amount = parse_units("10", "ether").unwrap();
             offer_builder.lock_collateral(collateral_amount);
-            request_builder = request_builder.with_offer(offer_builder.build()?);
+            request_builder = request_builder.with_offer(offer_builder);
+
+            tracing::debug!("Request: {:?}", &request_builder);
 
             // Submit and wait for fulfillment
             let (request_id, expires_at) = client

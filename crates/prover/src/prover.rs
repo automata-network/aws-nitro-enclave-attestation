@@ -306,6 +306,18 @@ impl NitroEnclaveProver {
                 if let Some(program_url) = &system_cfg.program_url {
                     std::env::set_var("BOUNDLESS_PROGRAM_URL", program_url);
                 }
+                if let Some(min_price) = system_cfg.min_price {
+                    std::env::set_var("BOUNDLESS_MIN_PRICE", min_price.to_string());
+                }
+                if let Some(max_price) = system_cfg.max_price {
+                    std::env::set_var("BOUNDLESS_MAX_PRICE", max_price.to_string());
+                }
+                if let Some(timeout) = system_cfg.timeout {
+                    std::env::set_var("BOUNDLESS_TIMEOUT", timeout.to_string());
+                }
+                if let Some(ramp_up_period) = system_cfg.ramp_up_period {
+                    std::env::set_var("BOUNDLESS_RAMP_UP_PERIOD", ramp_up_period.to_string());
+                }
 
                 NitroEnclaveProver {
                     contract,

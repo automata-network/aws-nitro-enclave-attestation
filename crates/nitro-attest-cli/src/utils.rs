@@ -70,19 +70,19 @@ pub struct ProverArgs {
     pub risc0_proof_type: BoundlessProofTypeCli,
 
     /// Minimum price in wei per cycle
-    #[arg(long)]
+    #[arg(long, env = "BOUNDLESS_MIN_PRICE")]
     pub risc0_min_price: Option<u128>,
 
     /// Maximum price in wei per cycle
-    #[arg(long)]
+    #[arg(long, env = "BOUNDLESS_MAX_PRICE")]
     pub risc0_max_price: Option<u128>,
 
     /// Timeout in seconds
-    #[arg(long)]
+    #[arg(long, env = "BOUNDLESS_TIMEOUT")]
     pub risc0_timeout: Option<u32>,
 
     /// Ramp-up period in seconds
-    #[arg(long)]
+    #[arg(long, env = "BOUNDLESS_RAMP_UP_PERIOD")]
     pub risc0_ramp_up_period: Option<u32>,
 }
 
