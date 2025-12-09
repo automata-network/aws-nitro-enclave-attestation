@@ -22,13 +22,13 @@ use boundless_market::{
     StorageProvider,
 };
 use lazy_static::lazy_static;
-use risc0_ethereum_contracts::groth16;
+use risc0_ethereum_contracts::{groth16, receipt::decode_seal_with_claim};
 use risc0_methods::{
     RISC0_AGGREGATOR_ELF, RISC0_AGGREGATOR_ID, RISC0_VERIFIER_ELF, RISC0_VERIFIER_ID,
 };
 use risc0_zkvm::{
-    default_executor, Digest, ExecutorEnv, Groth16Receipt, Groth16ReceiptVerifierParameters,
-    InnerReceipt, Journal, MaybePruned, Receipt, ReceiptClaim, VERSION, compute_image_id
+    default_executor, Digest, ExecutorEnv, InnerReceipt, Receipt, ReceiptClaim, VERSION,
+    compute_image_id,
 };
 use serde::Serialize;
 
@@ -312,12 +312,12 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
     }
 
     /// Dev mode: execute aggregator zkVM without proof generation.
-    /// Reconstructs Receipts from seal bytes and journals, then runs the aggregator program.
+    /// Deserializes full Receipts from bincode-encoded data.
     fn gen_dev_aggregated_proof(
         input_bytes: &[u8],
         encoded_proofs: &[&Bytes],
     ) -> anyhow::Result<RawProof> {
-        // Decode BatchVerifierInput to get journals
+        // Decode BatchVerifierInput to verify array length
         let batch_input = BatchVerifierInput::decode(input_bytes)
             .context("Failed to decode BatchVerifierInput")?;
 
@@ -330,17 +330,14 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
             ));
         }
 
-        // Reconstruct Receipts from seals and journals
-        // In dev mode, seals may be empty but verify() will skip verification
-        let verifier_image_id = Digest::new(*RISC0_VERIFIER_ID);
+        // Deserialize full Receipts (which include the correct journal bytes)
         let receipts: Vec<Receipt> = encoded_proofs
             .iter()
-            .zip(batch_input.outputs.iter())
-            .map(|(seal, journal)| {
-                let journal_bytes = journal.encode();
-                Self::construct_receipt(seal.to_vec(), journal_bytes, verifier_image_id)
+            .map(|encoded_receipt| {
+                bincode::deserialize(encoded_receipt)
+                    .context("Failed to deserialize Receipt")
             })
-            .collect::<Result<_, _>>()?;
+            .collect::<anyhow::Result<_>>()?;
 
         // Build AggregatorInput (postcard + length-prefix framing)
         let aggregator_input = AggregatorInput {
@@ -370,8 +367,7 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
 
     /// Production: generate proof via Boundless network.
     ///
-    /// For `RawProofType::Composite`, serializes full `Receipt` (for aggregation).
-    /// For `RawProofType::Groth16`, serializes `InnerReceipt` (for on-chain verification).
+    /// Serializes full `Receipt` (including journal) so aggregation can reconstruct it exactly.
     fn gen_proof_boundless(
         &self,
         input_bytes: &[u8],
@@ -385,22 +381,22 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
             let (seal_bytes, journal_bytes) =
                 Self::submit_boundless_request(input_bytes, self.elf, cfg, program_url, true).await?;
 
-            // Construct Receipt from fulfillment
+            // Construct Receipt from fulfillment - stores full Receipt for aggregation
             let receipt = Self::construct_receipt(seal_bytes, journal_bytes.clone(), image_id)?;
-            let claim = receipt.inner;
 
-            Ok(RawProof::from_proof(&claim, journal_bytes.into())?)
+            // Store full Receipt (not just InnerReceipt) to preserve journal bytes exactly
+            Ok(RawProof::from_proof(&receipt, journal_bytes.into())?)
         })
     }
 
     /// Production: generate aggregated proof via Boundless.
-    /// Reconstructs Receipts from seal bytes and journals, then submits aggregation request.
+    /// Deserializes full Receipts from bincode-encoded data.
     fn gen_proof_boundless_aggregated(
         input_bytes: &[u8],
         encoded_proofs: &[&Bytes],
         cfg: &RiscZeroProverConfig,
     ) -> anyhow::Result<RawProof> {
-        // Decode BatchVerifierInput to get journals
+        // Decode BatchVerifierInput to verify array length
         let batch_input = BatchVerifierInput::decode(input_bytes)
             .context("Failed to decode BatchVerifierInput")?;
 
@@ -413,16 +409,14 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
             ));
         }
 
-        // Reconstruct Receipts from seals and journals
-        let verifier_image_id = Digest::new(*RISC0_VERIFIER_ID);
+        // Deserialize full Receipts (which include the correct journal bytes)
         let receipts: Vec<Receipt> = encoded_proofs
             .iter()
-            .zip(batch_input.outputs.iter())
-            .map(|(seal, journal)| {
-                let journal_bytes = journal.encode();
-                Self::construct_receipt(seal.to_vec(), journal_bytes, verifier_image_id)
+            .map(|encoded_receipt| {
+                bincode::deserialize(encoded_receipt)
+                    .context("Failed to deserialize Receipt")
             })
-            .collect::<Result<_, _>>()?;
+            .collect::<anyhow::Result<_>>()?;
 
         // Build AggregatorInput (postcard + length-prefix framing)
         let aggregator_input = AggregatorInput {
@@ -442,48 +436,46 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
             let (seal_bytes, journal_bytes) =
                 Self::submit_boundless_request(&framed_input, RISC0_AGGREGATOR_ELF, cfg, program_url, true).await?;
 
-            // Construct Receipt from fulfillment
-            let aggregator_image_id = compute_image_id(&RISC0_AGGREGATOR_ELF)?;
+            // Construct Receipt from fulfillment (seal has selector prefix)
+            let aggregator_image_id = compute_image_id(RISC0_AGGREGATOR_ELF)?;
             let receipt = Self::construct_receipt(seal_bytes, journal_bytes.clone(), aggregator_image_id)?;
-            let claim = receipt.inner;
 
-            Ok(RawProof::from_proof(&claim, journal_bytes.into())?)
+            Ok(RawProof::from_proof(&receipt, journal_bytes.into())?)
         })
     }
 
-    /// Construct a Receipt from Boundless fulfillment data
+    /// Construct a Receipt from Boundless fulfillment data.
+    /// The seal should include the 4-byte selector prefix followed by ABI-encoded proof.
     fn construct_receipt(
         seal: Vec<u8>,
         journal: Vec<u8>,
         image_id: Digest,
     ) -> anyhow::Result<Receipt> {
-        use risc0_zkvm::sha::Digestible;
+        // Handle empty seals (dev mode) - create FakeReceipt
+        if seal.is_empty() {
+            let claim = ReceiptClaim::ok(image_id, journal.clone());
+            return Ok(Receipt::new(
+                InnerReceipt::Fake(risc0_zkvm::FakeReceipt::new(claim)),
+                journal,
+            ));
+        }
 
-        // Create the journal
-        let journal_obj = Journal::new(journal);
+        // Use decode_seal_with_claim which:
+        // - Reads selector from first 4 bytes to determine seal type
+        // - Extracts correct verifier parameters from the selector
+        // - Handles Groth16, FakeReceipt, and SetVerifier seal types
+        let claim = ReceiptClaim::ok(image_id, journal.clone());
+        let receipt = decode_seal_with_claim(
+            alloy_primitives::Bytes::from(seal),
+            claim,
+            journal,
+        )
+        .context("Failed to decode seal")?;
 
-        // Construct the receipt claim for a successful execution
-        let claim = ReceiptClaim::ok(
-            image_id,
-            MaybePruned::Pruned(journal_obj.digest()),
-        );
-
-        // Get default Groth16 verifier parameters
-        let verifier_params = Groth16ReceiptVerifierParameters::default();
-        let verifier_params_digest = verifier_params.digest();
-
-        // Construct Groth16Receipt
-        let groth16_receipt = Groth16Receipt::new(
-            seal,
-            MaybePruned::Value(claim),
-            verifier_params_digest,
-        );
-
-        // Wrap in InnerReceipt and create Receipt
-        let inner = InnerReceipt::Groth16(groth16_receipt);
-        let receipt = Receipt::new(inner, journal_obj.bytes.clone());
-
-        Ok(receipt)
+        receipt
+            .receipt()
+            .cloned()
+            .ok_or_else(|| anyhow!("Expected base receipt, got set inclusion receipt"))
     }
 }
 
@@ -502,8 +494,8 @@ where
     }
 
     fn onchain_proof(&self, proof: &RawProof) -> anyhow::Result<Bytes> {
-        let receipt = proof.decode_proof::<InnerReceipt>()?;
-        let encoded_proof = match receipt {
+        let receipt = proof.decode_proof::<Receipt>()?;
+        let encoded_proof = match &receipt.inner {
             InnerReceipt::Groth16(groth16_receipt) => groth16::encode(&groth16_receipt.seal)?,
             _ => vec![],
         };

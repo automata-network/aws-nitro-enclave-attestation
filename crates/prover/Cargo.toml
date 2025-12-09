@@ -15,7 +15,7 @@ pico = ["dep:pico-sdk", "dep:pico-vm", "dep:pico-methods", "dep:p3-field"]
 anyhow.workspace = true
 aws-nitro-enclave-attestation-verifier.workspace = true
 x509-verifier-rust-crypto.workspace = true
-risc0-ethereum-contracts = { workspace = true, optional = true }
+risc0-ethereum-contracts = { workspace = true, optional = true, features = ["unstable"] }
 risc0-zkvm = { workspace = true, optional = true, default-features = true }
 risc0-methods = { workspace = true, optional = true }
 sp1-methods = { workspace = true, optional = true }
