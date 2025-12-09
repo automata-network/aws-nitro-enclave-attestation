@@ -61,9 +61,13 @@ pub struct ProverArgs {
     #[arg(long, env = "BOUNDLESS_PRIVATE_KEY")]
     pub risc0_private_key: Option<String>,
 
-    /// Program URL for pre-uploaded ELF (optional)
-    #[arg(long, env = "BOUNDLESS_PROGRAM_URL")]
-    pub risc0_program_url: Option<String>,
+    /// Verifier program URL for pre-uploaded ELF (optional, uploads to IPFS if not set)
+    #[arg(long, env = "BOUNDLESS_VERIFIER_PROGRAM_URL")]
+    pub risc0_verifier_program_url: Option<String>,
+
+    /// Aggregator program URL for pre-uploaded ELF (optional, uploads to IPFS if not set)
+    #[arg(long, env = "BOUNDLESS_AGGREGATOR_PROGRAM_URL")]
+    pub risc0_aggregator_program_url: Option<String>,
 
     /// Proof type for Boundless proving (groth16 or merkle)
     #[arg(long, value_enum, default_value = "groth16")]
@@ -130,7 +134,8 @@ impl ProverArgs {
             return Ok(ProverConfig::risc0_with(RiscZeroProverConfig {
                 rpc_url: self.risc0_rpc_url.clone(),
                 private_key: self.risc0_private_key.clone(),
-                program_url: self.risc0_program_url.clone(),
+                verifier_program_url: self.risc0_verifier_program_url.clone(),
+                aggregator_program_url: self.risc0_aggregator_program_url.clone(),
                 proof_type,
                 min_price: self.risc0_min_price,
                 max_price: self.risc0_max_price,

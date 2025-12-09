@@ -303,8 +303,11 @@ impl NitroEnclaveProver {
                 if let Some(private_key) = &system_cfg.private_key {
                     std::env::set_var("BOUNDLESS_PRIVATE_KEY", private_key);
                 }
-                if let Some(program_url) = &system_cfg.program_url {
-                    std::env::set_var("BOUNDLESS_PROGRAM_URL", program_url);
+                if let Some(program_url) = &system_cfg.verifier_program_url {
+                    std::env::set_var("BOUNDLESS_VERIFIER_PROGRAM_URL", program_url);
+                }
+                if let Some(program_url) = &system_cfg.aggregator_program_url {
+                    std::env::set_var("BOUNDLESS_AGGREGATOR_PROGRAM_URL", program_url);
                 }
                 if let Some(min_price) = system_cfg.min_price {
                     std::env::set_var("BOUNDLESS_MIN_PRICE", min_price.to_string());

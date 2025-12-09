@@ -39,3 +39,4 @@ alloy-signer-local = { workspace = true }
 tracing.workspace = true
 crossbeam.workspace = true
 lazy_static.workspace = true
+postcard = { version = "1.0", features = ["alloc"] }
