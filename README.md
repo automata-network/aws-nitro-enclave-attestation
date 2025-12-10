@@ -61,7 +61,7 @@ A comprehensive SDK for AWS Nitro Enclave attestation verification that generate
 
 | ZkType | Verifier ID | Verifier Proof ID | Aggregator ID |
 | ------ | ----------- | ----------------- | ------------- |
-| Risc0  | 0x9d3db93f237fb35261e1d67b1253cdbdada02f80d038968f6340357d4fcc82c6 | 0x9d3db93f237fb35261e1d67b1253cdbdada02f80d038968f6340357d4fcc82c6 | 0xb087de2eb814b682e81a69d9b8d5d2bb215a29f71755a1672d818104cddf3d42 |
+| Risc0  | 0x9d3db93f237fb35261e1d67b1253cdbdada02f80d038968f6340357d4fcc82c6 | 0x9d3db93f237fb35261e1d67b1253cdbdada02f80d038968f6340357d4fcc82c6 | 0x5d4be80285085a56592051cf9214b647c8e9e3e94255b90c82738075e7393684 |
 | SP1    | 0x00326cc10dc6dbcf4249c7adb4d515b9bdbff20f541da85921fc9ddf930e7bb0 | 0x86603619d0f3b671b6f538499b5b514d7a90ff6d64a17650bf3bf943b07b0e13 | 0x00ed49951c84f8af646740f7fe6353b1dd274aea8dc108720ef0727b2bcfca1b |
 | Pico    | 0x009fa7467192bf60230f423dcc0b880ebebbffe955d7f75a8ac9bcbf5a58ba98 | 0x38a3d34f08d8af64b947e861eb80b8404affdf756add5f577e79931598ba585a | 0x00093dbf39d4986be382e062dcbf34d2bc8105637de89bdaaa588014a9c53e9b |
 
@@ -342,8 +342,10 @@ $ forge build
      ├── nitro-attest-cli/  # CLI application
      ├── prover/            # Proof generation logic
      ├── verifier/          # Verification utilities
-     ├── risc0-methods/     # RISC0-specific methods
-     └── sp1-methods/       # SP1-specific methods
+     ├── risc0-methods/     # RISC0-specific zkVM methods
+     ├── sp1-methods/       # SP1-specific zkVM methods
+     ├── pico-methods/      # Pico-specific zkVM methods
+     └── x509-verifier-rust-crypto/ # X509 certificate verification
 ```
 
 ## Performance Benchmarks
@@ -386,16 +388,7 @@ The following table shows how certificate caching reduces computational overhead
 
 The following table shows the additional cycles used for aggregation.
 
-#### Risc0
-| Aggregated Reports | Proving Cycles | Proving Cycles per Report | Cycles Improvement |
-| ------------------ | -------------- | ------------------------- | ------------------ |
-| 1                  | 131,072        | 131,072                   | Baseline           |
-| 2                  | 131,072        | 65,536                    | 50.0% reduction    |
-| 5                  | 262,144        | 52,428.8                  | 60.0% reduction    |
-| 10                 | 524,288        | 52,428.8                  | 60.0% reduction    |
-| 100                | 3,407,872      | 34,078.7                  | 74.0% reduction    |
-
-#### Succinct
+#### Succinct (SP1)
 | Aggregated Reports | Proving Cycles | Proving Cycles per Report | Cycles Improvement |
 | ------------------ | -------------- | ------------------------- | ------------------ |
 | 1                  | 1,368,769      | 1,368,769                 | Baseline           |
@@ -403,6 +396,14 @@ The following table shows the additional cycles used for aggregation.
 | 5                  | 2,884,700      | 576,940                   | 57.8% reduction    |
 | 10                 | 4,830,986      | 483,098                   | 64.7% reduction    |
 | 100                | 34,680,156     | 346,801                   | 74.7% reduction    |
+
+> [!NOTE]
+> **RISC0 (Boundless) Aggregation Costs**
+>
+> Unlike SP1 which uses efficient recursion circuits to verify child proofs as "assumptions", Boundless executes full Groth16 proof verification internally within the zkVM. This approach incurs approximately **200+ million cycles per additional proof** verified, meaning aggregation costs scale linearly rather than amortizing.
+>
+> Before using proof aggregation with Boundless, users should compare the additional proving cycle costs against the gas savings from batching on-chain verifications. In many cases, submitting individual Groth16 proofs for on-chain verification may be more cost-effective than paying for the expensive in-zkVM proof verification.
+
 </details>
 
 <details>
@@ -440,20 +441,35 @@ Batch verification provides significant gas savings compared to individual verif
 NETWORK_PRIVATE_KEY environment variable is not set. Please set it to your private key or use the .private_key() method.
 ```
 
-**RISC0 Bonsai Key Missing:**
+**RISC0 Boundless Key Missing:**
 ```
-missing BONSAI_API_KEY env var
+missing BOUNDLESS_PRIVATE_KEY
 ```
 
 **Solution:**
-- For SP1 remote proving: Set `SP1_PRIVATE_KEY` environment variable with your SP1 network private key
-- For RISC0 remote proving: Set `BONSAI_API_KEY` environment variable with your Bonsai API key
+- For SP1 remote proving: Set `NETWORK_PRIVATE_KEY` environment variable with your SP1 network private key
+- For RISC0 remote proving via Boundless: Set the following environment variables:
+  - `BOUNDLESS_RPC_URL` - Boundless network RPC URL
+  - `BOUNDLESS_PRIVATE_KEY` - Your wallet private key (hex-encoded)
+  - [Storage Provider Configuration Environmental Variables](https://docs.boundless.network/developers/tutorials/request#storage-providers)
 - For local testing without remote proving: Set `DEV_MODE=true` to generate development proofs
 
 ```bash
-# For production remote proving
-export SP1_PRIVATE_KEY=your_sp1_private_key
-export BONSAI_API_KEY=your_bonsai_api_key
+# For SP1 production remote proving
+export NETWORK_PRIVATE_KEY=your_sp1_network_private_key
+
+# For RISC0 production remote proving (via Boundless)
+export BOUNDLESS_RPC_URL=https://rpc.boundless.xyz
+export BOUNDLESS_PRIVATE_KEY=your_wallet_private_key
+# ... storage configuuration values
+
+# Optional Boundless configuration
+export BOUNDLESS_VERIFIER_PROGRAM_URL=ipfs://...   # Pre-uploaded verifier ELF URL
+export BOUNDLESS_AGGREGATOR_PROGRAM_URL=ipfs://... # Pre-uploaded aggregator ELF URL
+export BOUNDLESS_MIN_PRICE=100000                  # Min price in wei per cycle
+export BOUNDLESS_MAX_PRICE=1000000                 # Max price in wei per cycle
+export BOUNDLESS_TIMEOUT=3600                      # Timeout in seconds
+export BOUNDLESS_RAMP_UP_PERIOD=300                # Ramp-up period in seconds
 
 # For development/testing
 export DEV_MODE=true
