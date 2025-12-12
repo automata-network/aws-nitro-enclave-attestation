@@ -31,13 +31,13 @@ contract NitroEnclavePicoTest is Test {
         // configure Pico zkVerifier
         bytes32 nitroPicoVerifierVkey = abi.decode(vm.parseJson(picoInputJson, ".riscvVKey"), (bytes32));
         bytes32 nitroPicoAggregatorVkey = abi.decode(vm.parseJson(picoAggregatedInputJson, ".riscvVKey"), (bytes32));
+        bytes32 nitroPicoVerifierProofId = 0x38a3d34f08d8af64b947e861eb80b8404affdf756add5f577e79931598ba585a; // not in the input.json but you can get this from OnchainProof returned by the CLI
         ZkCoProcessorConfig memory picoConfig = ZkCoProcessorConfig({
             verifierId: nitroPicoVerifierVkey,
-            verifierProofId: 0x38a3d34f08d8af64b947e861eb80b8404affdf756add5f577e79931598ba585a, // not in the input.json but you can get this from OnchainProof returned by the CLI
             aggregatorId: nitroPicoAggregatorVkey,
             zkVerifier: address(picoVerifier)
         });
-        verifier.setZkConfiguration(ZkCoProcessorType.Pico, picoConfig);
+        verifier.setZkConfiguration(ZkCoProcessorType.Pico, picoConfig, nitroPicoVerifierProofId);
 
         vm.stopPrank();
     }

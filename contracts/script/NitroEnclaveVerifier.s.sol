@@ -180,7 +180,6 @@ contract NitroEnclaveVerifierScript is Script {
 
         ZkCoProcessorConfig memory config = ZkCoProcessorConfig({
             verifierId: verifierId,
-            verifierProofId: verifierProofId,
             aggregatorId: aggregatorId,
             zkVerifier: address(0)
         });
@@ -191,12 +190,13 @@ contract NitroEnclaveVerifierScript is Script {
         } else {
             revert("unknown zkType");
         }
-        
+
         INitroEnclaveVerifier verifier = INitroEnclaveVerifier(readDeployed("VERIFIER"));
         ZkCoProcessorConfig memory remoteConfig = verifier.getZkConfig(zkType);
-        
-        if (remoteConfig.verifierId == config.verifierId 
-            && remoteConfig.verifierProofId == config.verifierProofId
+        bytes32 remoteVerifierProofId = verifier.getVerifierProofId(zkType, remoteConfig.verifierId);
+
+        if (remoteConfig.verifierId == config.verifierId
+            && remoteVerifierProofId == verifierProofId
             && remoteConfig.aggregatorId == config.aggregatorId
             && remoteConfig.zkVerifier == config.zkVerifier) {
             console.log(string(abi.encodePacked(zktype, " configuration matches remote, skip update")));
@@ -205,7 +205,7 @@ contract NitroEnclaveVerifierScript is Script {
 
         console.log(string(abi.encodePacked(zktype, " configuration differs, updating...")));
         vm.startBroadcast();
-        verifier.setZkConfiguration(zkType, config);
+        verifier.setZkConfiguration(zkType, config, verifierProofId);
         vm.stopBroadcast();
     }
 
