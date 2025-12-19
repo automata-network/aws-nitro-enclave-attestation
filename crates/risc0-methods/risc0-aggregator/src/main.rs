@@ -1,10 +1,10 @@
-use aws_nitro_enclave_attestation_verifier::stub::{BatchVerifierInput, BatchVerifierJournal};
+use aws_nitro_enclave_attestation_verifier::stub::BatchVerifierJournal;
 use risc0_zkvm::{guest::env, Receipt};
 use serde::Deserialize;
 
 /// Input format for the aggregator when used with Boundless.
 /// The host sends a postcard-serialized tuple of:
-/// - ABI-encoded BatchVerifierInput bytes
+/// - ABI-encoded BatchVerifierJournal bytes
 /// - Vector of receipts (one per verification)
 #[derive(Deserialize)]
 struct AggregatorInput {
@@ -13,13 +13,13 @@ struct AggregatorInput {
 }
 
 fn main() {
-    // Read postcard-serialized input: (ABI-encoded BatchVerifierInput, Vec<Receipt>)
+    // Read postcard-serialized input: (ABI-encoded BatchVerifierJournal, Vec<Receipt>)
     let frame_bytes = env::read_frame();
     let aggregator_input: AggregatorInput =
         postcard::from_bytes(&frame_bytes).expect("Failed to decode postcard input");
 
-    let input = BatchVerifierInput::decode(&aggregator_input.input_bytes)
-        .expect("Failed to decode BatchVerifierInput");
+    let input = BatchVerifierJournal::decode(&aggregator_input.input_bytes)
+        .expect("Failed to decode BatchVerifierJournal");
 
     // Verify each receipt matches the expected output
     assert_eq!(

@@ -10,7 +10,7 @@ use alloy_primitives::Bytes;
 use anyhow::{anyhow, bail, Context};
 use aws_nitro_enclave_attestation_verifier::{
     stub::{
-        BatchVerifierInput, BatchVerifierJournal, VerifierInput, VerifierJournal, ZkCoProcessorType,
+        BatchVerifierJournal, VerifierInput, VerifierJournal, ZkCoProcessorType,
     },
     AttestationReport,
 };
@@ -242,7 +242,7 @@ pub struct NitroEnclaveProver {
     /// ZK program for verifying individual attestation reports
     pub verifier: Box<dyn Program<Input = VerifierInput, Output = VerifierJournal>>,
     /// ZK program for aggregating multiple proofs into a single proof
-    pub aggregator: Box<dyn Program<Input = BatchVerifierInput, Output = BatchVerifierJournal>>,
+    pub aggregator: Box<dyn Program<Input = BatchVerifierJournal, Output = BatchVerifierJournal>>,
 }
 
 impl NitroEnclaveProver {
@@ -507,7 +507,7 @@ impl NitroEnclaveProver {
             encoded_proofs.push(&item.encoded_proof);
         }
 
-        let batch_input = BatchVerifierInput {
+        let batch_input = BatchVerifierJournal {
             verifierVk: self.verifier.verify_proof_id(),
             outputs: journals,
         };
@@ -666,10 +666,14 @@ impl NitroEnclaveProver {
             Some(verifier_contract) => {
                 // make sure the zk config aligned
                 let zk_config = block_on(verifier_contract.zk_config(self.verifier.zktype()))?;
+                let verifier_proof_id = block_on(verifier_contract.get_verifier_proof_id(
+                    self.verifier.zktype(),
+                    zk_config.verifierId,
+                ))?;
                 max_time_diff = block_on(verifier_contract.max_time_diff())?;
 
                 let program_id = self.get_program_id();
-                let verify_result = program_id.verify(&zk_config).with_context(|| {
+                let verify_result = program_id.verify(&zk_config, verifier_proof_id).with_context(|| {
                     format!("Failed to verify zkconfig for {:?}", self.verifier.zktype())
                 });
                 if let Err(verify_err) = verify_result {

@@ -6,7 +6,7 @@ use alloy_primitives::{hex, Bytes, B256, U256};
 use alloy_sol_types::SolValue;
 use anyhow::anyhow;
 use aws_nitro_enclave_attestation_verifier::stub::{
-    BatchVerifierInput, BatchVerifierJournal, VerifierInput, VerifierJournal, ZkCoProcessorType,
+    BatchVerifierJournal, VerifierInput, VerifierJournal, ZkCoProcessorType,
 };
 use lazy_static::lazy_static;
 use p3_field::PrimeField;
@@ -26,7 +26,7 @@ use crate::{
 lazy_static! {
     pub static ref PICO_PROGRAM_VERIFIER: ProgramPico<VerifierInput, VerifierJournal> =
         ProgramPico::new(PICO_VERIFIER_ELF);
-    pub static ref PICO_PROGRAM_AGGREGATOR: ProgramPico<BatchVerifierInput, BatchVerifierJournal> =
+    pub static ref PICO_PROGRAM_AGGREGATOR: ProgramPico<BatchVerifierJournal, BatchVerifierJournal> =
         ProgramPico::new(PICO_AGGREGATOR_ELF);
 }
 

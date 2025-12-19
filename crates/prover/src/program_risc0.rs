@@ -5,7 +5,7 @@ use alloy_primitives::{hex, Bytes, B256};
 use alloy_sol_types::SolValue;
 use anyhow::{anyhow, Context};
 use aws_nitro_enclave_attestation_verifier::stub::{
-    BatchVerifierInput, BatchVerifierJournal, VerifierInput, VerifierJournal, ZkCoProcessorType,
+    BatchVerifierJournal, VerifierInput, VerifierJournal, ZkCoProcessorType,
 };
 use boundless_market::{
     alloy::{
@@ -41,7 +41,7 @@ use crate::{
 lazy_static! {
     pub static ref RISC0_PROGRAM_VERIFIER: ProgramRisc0<VerifierInput, VerifierJournal> =
         ProgramRisc0::new(RISC0_VERIFIER_ELF, *RISC0_VERIFIER_ID);
-    pub static ref RISC0_PROGRAM_AGGREGATOR: ProgramRisc0<BatchVerifierInput, BatchVerifierJournal> =
+    pub static ref RISC0_PROGRAM_AGGREGATOR: ProgramRisc0<BatchVerifierJournal, BatchVerifierJournal> =
         ProgramRisc0::new(RISC0_AGGREGATOR_ELF, *RISC0_AGGREGATOR_ID);
 }
 
@@ -317,9 +317,9 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
         input_bytes: &[u8],
         encoded_proofs: &[&Bytes],
     ) -> anyhow::Result<RawProof> {
-        // Decode BatchVerifierInput to verify array length
-        let batch_input = BatchVerifierInput::decode(input_bytes)
-            .context("Failed to decode BatchVerifierInput")?;
+        // Decode BatchVerifierJournal to verify array length
+        let batch_input = BatchVerifierJournal::decode(input_bytes)
+            .context("Failed to decode BatchVerifierJournal")?;
 
         // Verify array lengths match
         if encoded_proofs.len() != batch_input.outputs.len() {
@@ -396,9 +396,9 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
         encoded_proofs: &[&Bytes],
         cfg: &RiscZeroProverConfig,
     ) -> anyhow::Result<RawProof> {
-        // Decode BatchVerifierInput to verify array length
-        let batch_input = BatchVerifierInput::decode(input_bytes)
-            .context("Failed to decode BatchVerifierInput")?;
+        // Decode BatchVerifierJournal to verify array length
+        let batch_input = BatchVerifierJournal::decode(input_bytes)
+            .context("Failed to decode BatchVerifierJournal")?;
 
         // Verify array lengths match
         if encoded_proofs.len() != batch_input.outputs.len() {

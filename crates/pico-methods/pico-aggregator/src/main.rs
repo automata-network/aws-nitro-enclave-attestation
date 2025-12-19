@@ -5,13 +5,13 @@ use pico_sdk::{
     verify::verify_pico_proof,
 };
 
-use aws_nitro_enclave_attestation_verifier::stub::{BatchVerifierInput, BatchVerifierJournal};
+use aws_nitro_enclave_attestation_verifier::stub::{BatchVerifierJournal};
 
 pub fn main() {
     let input_bytes = read_vec();
 
     let input =
-        BatchVerifierInput::decode(&input_bytes).expect("Failed to decode BatchVerifierInput");
+        BatchVerifierJournal::decode(&input_bytes).expect("Failed to decode BatchVerifierJournal");
 
     let vk_digest: [u32; 8] = unsafe { std::mem::transmute(input.verifierVk) };
 

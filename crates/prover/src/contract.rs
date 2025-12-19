@@ -89,7 +89,8 @@ impl NitroEnclaveVerifierContract {
         let proof_bytes = proof.onchain_proof.clone();
         let zk = proof.zktype;
         let zk_config = self.zk_config(proof.zktype).await?;
-        proof.program_id.verify(&zk_config)?;
+        let verifier_proof_id = self.get_verifier_proof_id(proof.zktype, zk_config.verifierId).await?;
+        proof.program_id.verify(&zk_config, verifier_proof_id)?;
 
         Ok(match proof.proof_type {
             ProofType::Verifier => {
@@ -138,6 +139,18 @@ impl NitroEnclaveVerifierContract {
 
     pub async fn zk_config(&self, zk: ZkCoProcessorType) -> anyhow::Result<ZkCoProcessorConfig> {
         let call = getZkConfigCall { _zkCoProcessor: zk };
+        self.call(&call).await
+    }
+
+    pub async fn get_verifier_proof_id(
+        &self,
+        zk: ZkCoProcessorType,
+        verifier_id: B256,
+    ) -> anyhow::Result<B256> {
+        let call = getVerifierProofIdCall {
+            _zkCoProcessor: zk,
+            _verifierId: verifier_id,
+        };
         self.call(&call).await
     }
 

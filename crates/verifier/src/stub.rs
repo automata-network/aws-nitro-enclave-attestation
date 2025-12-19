@@ -62,17 +62,6 @@ impl VerifierJournal {
     }
 }
 
-impl BatchVerifierInput {
-    pub fn encode(&self) -> Vec<u8> {
-        self.abi_encode()
-    }
-
-    pub fn decode(buf: &[u8]) -> anyhow::Result<Self> {
-        Ok(Self::abi_decode(buf)
-            .map_err(|err| anyhow!("Failed to decode BatchVerifierInput: {}", err))?)
-    }
-}
-
 impl BatchVerifierJournal {
     pub fn encode(&self) -> Vec<u8> {
         self.abi_encode()

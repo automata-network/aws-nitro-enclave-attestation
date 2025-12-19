@@ -74,15 +74,15 @@ pub struct ProgramId {
 }
 
 impl ProgramId {
-    pub fn verify(&self, zk_config: &ZkCoProcessorConfig) -> anyhow::Result<()> {
+    pub fn verify(&self, zk_config: &ZkCoProcessorConfig, verifier_proof_id: B256) -> anyhow::Result<()> {
         if zk_config.aggregatorId != self.aggregator_id
             || zk_config.verifierId != self.verifier_id
-            || zk_config.verifierProofId != self.verifier_proof_id
+            || verifier_proof_id != self.verifier_proof_id
         {
             return Err(anyhow!(
                 "Program ID mismatch with on-chain config: want: {{verifierId={}, verifierProofId={}, aggregatorId={}}}, got: {{verifierId={}, verifierProofId={}, aggregatorId={}}})",
                 zk_config.verifierId,
-                zk_config.verifierProofId,
+                verifier_proof_id,
                 zk_config.aggregatorId,
                 self.verifier_id,
                 self.verifier_proof_id,

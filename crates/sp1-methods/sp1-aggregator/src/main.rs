@@ -1,15 +1,14 @@
 #![no_main]
 sp1_zkvm::entrypoint!(main);
 
-use alloy_primitives::B256;
-use aws_nitro_enclave_attestation_verifier::stub::{BatchVerifierInput, BatchVerifierJournal};
+use aws_nitro_enclave_attestation_verifier::stub::BatchVerifierJournal;
 use sp1_zkvm::lib::verify::verify_sp1_proof;
 
 pub fn main() {
     // Read the verification keys.
     let input = sp1_zkvm::io::read_vec();
 
-    let input = BatchVerifierInput::decode(&input).expect("Failed to decode BatchVerifierInput");
+    let input = BatchVerifierJournal::decode(&input).expect("Failed to decode BatchVerifierJournal");
 
     let vk_digest: [u32; 8] = unsafe { std::mem::transmute(input.verifierVk) };
 

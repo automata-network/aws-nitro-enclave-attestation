@@ -4,7 +4,7 @@ use alloy_primitives::{hex::FromHex, Bytes, B256};
 use alloy_sol_types::SolValue;
 use anyhow::anyhow;
 use aws_nitro_enclave_attestation_verifier::stub::{
-    BatchVerifierInput, BatchVerifierJournal, VerifierInput, VerifierJournal, ZkCoProcessorType,
+    BatchVerifierJournal, VerifierInput, VerifierJournal, ZkCoProcessorType,
 };
 use lazy_static::lazy_static;
 use sp1_methods::{
@@ -52,7 +52,7 @@ impl TryFrom<SP1ProverConfig> for RemoteProverConfig {
 lazy_static! {
     pub static ref SP1_PROGRAM_VERIFIER: ProgramSP1<VerifierInput, VerifierJournal> =
         ProgramSP1::new(SP1_VERIFIER_ELF, &SP1_VERIFIER_VK, &SP1_VERIFIER_PK);
-    pub static ref SP1_PROGRAM_AGGREGATOR: ProgramSP1<BatchVerifierInput, BatchVerifierJournal> =
+    pub static ref SP1_PROGRAM_AGGREGATOR: ProgramSP1<BatchVerifierJournal, BatchVerifierJournal> =
         ProgramSP1::new(SP1_AGGREGATOR_ELF, &SP1_AGGREGATOR_VK, &SP1_AGGREGATOR_PK);
 }
 
