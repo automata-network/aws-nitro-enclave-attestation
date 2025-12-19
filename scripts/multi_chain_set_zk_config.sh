@@ -2,11 +2,13 @@
 
 set -e
 
-source ".env"
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONTRACTS_DIR="$PROJECT_ROOT/contracts"
+ORIGINAL_DIR="$(pwd)"
+
+source "$SCRIPT_DIR/auth_utils.sh"
+[ -f "$PROJECT_ROOT/.env" ] && source "$PROJECT_ROOT/.env"
 
 cd "$CONTRACTS_DIR"
 
@@ -21,12 +23,14 @@ Options:
     -m, --multiple CHAIN1,CHAIN2    Update ZK config on multiple chains (comma-separated)
     -a, --all                       Update ZK config on all chains in deploy-config.json
     -t, --type TYPE                 ZK type to update: sp1, risc0, or both (default: both)
+    -k, --keystore PATH             Use keystore file for authentication
     -l, --list                      List all available chains
     -d, --dry-run                   Simulate update without broadcasting transactions
     -h, --help                      Show this help message
 
-Environment Variables:
-    PRIVATE_KEY                     Private key for transactions (required)
+Authentication (one required):
+    PRIVATE_KEY                     Private key for transactions (environment variable)
+    --keystore PATH                 Path to keystore file (forge will prompt for password)
 
 Examples:
     # Update both SP1 and RISC0 config on Sepolia
@@ -43,6 +47,9 @@ Examples:
 
     # List available chains
     $0 --list
+
+    # Update using keystore
+    $0 --chain sepolia --keystore ~/.foundry/keystores/deployer.json
 
 EOF
 }
@@ -69,12 +76,6 @@ list_chains() {
 }
 
 check_requirements() {
-    if [ -z "$PRIVATE_KEY" ]; then
-        echo "Error: PRIVATE_KEY environment variable is not set"
-        echo "Please set it with: export PRIVATE_KEY=your_private_key"
-        exit 1
-    fi
-
     if ! command -v forge &> /dev/null; then
         echo "Error: forge command not found. Please install Foundry:"
         echo "https://getfoundry.sh/"
@@ -137,7 +138,7 @@ update_on_chain() {
     local cmd="forge script script/MultiChainSetZkConfig.s.sol:MultiChainSetZkConfigScript \
         --sig '${func_name}(string)' \
         '$chain_name' \
-        --private-key $PRIVATE_KEY"
+        $AUTH_FLAGS"
 
     if [ "$dry_run" != "true" ]; then
         cmd="$cmd --broadcast"
@@ -180,7 +181,7 @@ update_on_all_chains() {
     local func_name=$(get_function_name "$zk_type" "all")
 
     local cmd="forge script script/MultiChainSetZkConfig.s.sol:MultiChainSetZkConfigScript \
-        --sig '${func_name}()' --private-key $PRIVATE_KEY"
+        --sig '${func_name}()' $AUTH_FLAGS"
 
     if [ "$dry_run" != "true" ]; then
         cmd="$cmd --broadcast"
@@ -193,6 +194,7 @@ CHAIN_NAME=""
 MULTIPLE_CHAINS=""
 UPDATE_ALL=false
 ZK_TYPE="both"
+KEYSTORE_PATH=""
 DRY_RUN=false
 LIST_CHAINS=false
 
@@ -218,6 +220,10 @@ while [[ $# -gt 0 ]]; do
             fi
             shift 2
             ;;
+        -k|--keystore)
+            KEYSTORE_PATH="$2"
+            shift 2
+            ;;
         -l|--list)
             LIST_CHAINS=true
             shift
@@ -238,6 +244,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Resolve keystore path to absolute (relative to original directory)
+if [ -n "$KEYSTORE_PATH" ] && [[ "$KEYSTORE_PATH" != /* ]]; then
+    KEYSTORE_PATH="$ORIGINAL_DIR/$KEYSTORE_PATH"
+fi
+
 if [ "$LIST_CHAINS" = true ]; then
     list_chains
     exit 0
@@ -251,6 +262,7 @@ if [ -z "$CHAIN_NAME" ] && [ -z "$MULTIPLE_CHAINS" ] && [ "$UPDATE_ALL" = false 
 fi
 
 check_requirements
+setup_auth "$KEYSTORE_PATH"
 
 if [ "$DRY_RUN" = true ]; then
     echo "DRY RUN MODE - No transactions will be broadcasted"

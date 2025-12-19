@@ -22,3 +22,4 @@ evm_proof_artifacts/
 .DS_Store
 /contracts/broadcast/*
 out
+/contracts/deployments/31337.json
