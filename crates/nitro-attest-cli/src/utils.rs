@@ -46,7 +46,7 @@ pub struct ProverArgs {
     pub dev: bool,
 
     /// Private key for SP1 network prover
-    #[arg(long, env = "NETWORK_PRIVATE_KEY")]
+    #[arg(long, env = "SP1_PRIVATE_KEY")]
     pub sp1_private_key: Option<String>,
 
     /// RPC URL for SP1 network connection
@@ -114,6 +114,10 @@ impl ProverArgs {
         #[cfg(feature = "sp1")]
         if self.sp1 {
             use aws_nitro_enclave_attestation_prover::SP1ProverConfig;
+            // Set NETWORK_PRIVATE_KEY from SP1_PRIVATE_KEY before any SP1 SDK code runs
+            if let Some(ref pk) = self.sp1_private_key {
+                std::env::set_var("NETWORK_PRIVATE_KEY", pk);
+            }
             return Ok(ProverConfig::sp1_with(SP1ProverConfig {
                 private_key: self.sp1_private_key.clone(),
                 rpc_url: self.sp1_rpc_url.clone(),

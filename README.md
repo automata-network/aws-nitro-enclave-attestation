@@ -447,7 +447,7 @@ missing BOUNDLESS_PRIVATE_KEY
 ```
 
 **Solution:**
-- For SP1 remote proving: Set `NETWORK_PRIVATE_KEY` environment variable with your SP1 network private key
+- For SP1 remote proving: Set `SP1_PRIVATE_KEY` environment variable with your SP1 network private key
 - For RISC0 remote proving via Boundless: Set the following environment variables:
   - `BOUNDLESS_RPC_URL` - Boundless network RPC URL
   - `BOUNDLESS_PRIVATE_KEY` - Your wallet private key (hex-encoded)
