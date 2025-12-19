@@ -15,7 +15,8 @@ contract NitroEnclavePicoTest is Test {
     PicoVerifier picoVerifier;
     address admin = address(0x01);
     string picoInputJson = vm.readFile(string.concat(vm.projectRoot(), "/test/assets/inputs.json"));
-    string picoAggregatedInputJson = vm.readFile(string.concat(vm.projectRoot(), "/test/assets/inputs-aggregated.json"));
+    string picoAggregatedInputJson =
+        vm.readFile(string.concat(vm.projectRoot(), "/test/assets/inputs-aggregated.json"));
 
     function setUp() public {
         vm.startPrank(admin);
@@ -33,9 +34,7 @@ contract NitroEnclavePicoTest is Test {
         bytes32 nitroPicoAggregatorVkey = abi.decode(vm.parseJson(picoAggregatedInputJson, ".riscvVKey"), (bytes32));
         bytes32 nitroPicoVerifierProofId = 0x38a3d34f08d8af64b947e861eb80b8404affdf756add5f577e79931598ba585a; // not in the input.json but you can get this from OnchainProof returned by the CLI
         ZkCoProcessorConfig memory picoConfig = ZkCoProcessorConfig({
-            verifierId: nitroPicoVerifierVkey,
-            aggregatorId: nitroPicoAggregatorVkey,
-            zkVerifier: address(picoVerifier)
+            verifierId: nitroPicoVerifierVkey, aggregatorId: nitroPicoAggregatorVkey, zkVerifier: address(picoVerifier)
         });
         verifier.setZkConfiguration(ZkCoProcessorType.Pico, picoConfig, nitroPicoVerifierProofId);
 
@@ -59,11 +58,8 @@ contract NitroEnclavePicoTest is Test {
 
         (, bytes memory publicValues, uint256[8] memory proofArray) = _parsePicoInput(picoAggregatedInputJson);
 
-        VerifierJournal[] memory journals = verifier.batchVerify(
-            publicValues,
-            ZkCoProcessorType.Pico,
-            abi.encode(proofArray)
-        );
+        VerifierJournal[] memory journals =
+            verifier.batchVerify(publicValues, ZkCoProcessorType.Pico, abi.encode(proofArray));
 
         uint256 n = journals.length;
         for (uint256 i = 0; i < n; i++) {
@@ -71,11 +67,11 @@ contract NitroEnclavePicoTest is Test {
         }
     }
 
-    function _parsePicoInput(string memory json) private pure returns (
-        bytes32 riscvVKey,
-        bytes memory publicValues,
-        uint256[8] memory proofArray
-    ) {
+    function _parsePicoInput(string memory json)
+        private
+        pure
+        returns (bytes32 riscvVKey, bytes memory publicValues, uint256[8] memory proofArray)
+    {
         riscvVKey = abi.decode(vm.parseJson(json, ".riscvVKey"), (bytes32));
         publicValues = abi.decode(vm.parseJson(json, ".publicValues"), (bytes));
 

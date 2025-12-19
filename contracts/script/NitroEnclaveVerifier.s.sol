@@ -2,7 +2,11 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import {ZkCoProcessorConfig, ZkCoProcessorType, INitroEnclaveVerifier} from "../src/interfaces/INitroEnclaveVerifier.sol";
+import {
+    ZkCoProcessorConfig,
+    ZkCoProcessorType,
+    INitroEnclaveVerifier
+} from "../src/interfaces/INitroEnclaveVerifier.sol";
 import {NitroEnclaveVerifier} from "../src/NitroEnclaveVerifier.sol";
 import {SP1Verifier} from "@sp1-contracts/v5.0.0/SP1VerifierGroth16.sol";
 import {ControlID, RiscZeroGroth16Verifier} from "@risc0-ethereum/groth16/RiscZeroGroth16Verifier.sol";
@@ -34,7 +38,13 @@ contract NitroEnclaveVerifierScript is Script {
             }
         }
 
-        revert(string(abi.encodePacked("No deployment found for ", key, " from file or env, chainid:", block.chainid.toString())));
+        revert(
+            string(
+                abi.encodePacked(
+                    "No deployment found for ", key, " from file or env, chainid:", block.chainid.toString()
+                )
+            )
+        );
     }
 
     function isDeployed(string memory key) internal view returns (bool) {
@@ -75,7 +85,8 @@ contract NitroEnclaveVerifierScript is Script {
 
     function deployRisc0Verifier() public {
         vm.startBroadcast();
-        RiscZeroGroth16Verifier risc0Verifier = new RiscZeroGroth16Verifier(ControlID.CONTROL_ROOT, ControlID.BN254_CONTROL_ID);
+        RiscZeroGroth16Verifier risc0Verifier =
+            new RiscZeroGroth16Verifier(ControlID.CONTROL_ROOT, ControlID.BN254_CONTROL_ID);
         vm.stopBroadcast();
         require(address(risc0Verifier).code.length > 0, "Risc0Verifier deployment failed");
         console.log("Risc0Verifier deployed at", address(risc0Verifier));
@@ -87,18 +98,18 @@ contract NitroEnclaveVerifierScript is Script {
             console.log(string(abi.encodePacked(key, " not deployed yet")));
             return true;
         }
-        
+
         address deployedAddr = readDeployed(key);
         bytes memory chainBytecode = deployedAddr.code;
-        
+
         if (chainBytecode.length == 0) {
             console.log(string(abi.encodePacked(key, " address has no code, needs redeploy")));
             return true;
         }
-        
+
         bytes32 localHash = keccak256(localBytecode);
         bytes32 chainHash = keccak256(chainBytecode);
-        
+
         if (localHash != chainHash) {
             console.log(string(abi.encodePacked(key, " bytecode changed, needs redeploy")));
             console.log("Local bytecode hash:");
@@ -107,7 +118,7 @@ contract NitroEnclaveVerifierScript is Script {
             console.logBytes32(chainHash);
             return true;
         }
-        
+
         console.log(string(abi.encodePacked(key, " bytecode matches, skip deployment")));
         return false;
     }
@@ -116,14 +127,14 @@ contract NitroEnclaveVerifierScript is Script {
         string memory configPath = "deploy-config.json";
         string memory config = vm.readFile(configPath);
         uint64 maxTimeDiff = uint64(vm.parseJsonUint(config, ".deployment.maxTimeDiff"));
-        
+
         bytes memory localBytecode = type(NitroEnclaveVerifier).runtimeCode;
-        
+
         if (!needsRedeploy("VERIFIER", localBytecode)) {
             console.log("Skip NitroEnclaveVerifier deployment, using existing:", readDeployed("VERIFIER"));
             return false;
         }
-        
+
         vm.startBroadcast();
         NitroEnclaveVerifier verifier = new NitroEnclaveVerifier(msg.sender, maxTimeDiff, new bytes32[](0));
         vm.stopBroadcast();
@@ -178,11 +189,8 @@ contract NitroEnclaveVerifierScript is Script {
         console.log("Aggregator ID: ");
         console.logBytes32(aggregatorId);
 
-        ZkCoProcessorConfig memory config = ZkCoProcessorConfig({
-            verifierId: verifierId,
-            aggregatorId: aggregatorId,
-            zkVerifier: address(0)
-        });
+        ZkCoProcessorConfig memory config =
+            ZkCoProcessorConfig({verifierId: verifierId, aggregatorId: aggregatorId, zkVerifier: address(0)});
         if (zkType == ZkCoProcessorType.RiscZero) {
             config.zkVerifier = readDeployed("RISC0_VERIFIER");
         } else if (zkType == ZkCoProcessorType.Succinct) {
@@ -195,10 +203,10 @@ contract NitroEnclaveVerifierScript is Script {
         ZkCoProcessorConfig memory remoteConfig = verifier.getZkConfig(zkType);
         bytes32 remoteVerifierProofId = verifier.getVerifierProofId(zkType, remoteConfig.verifierId);
 
-        if (remoteConfig.verifierId == config.verifierId
-            && remoteVerifierProofId == verifierProofId
-            && remoteConfig.aggregatorId == config.aggregatorId
-            && remoteConfig.zkVerifier == config.zkVerifier) {
+        if (
+            remoteConfig.verifierId == config.verifierId && remoteVerifierProofId == verifierProofId
+                && remoteConfig.aggregatorId == config.aggregatorId && remoteConfig.zkVerifier == config.zkVerifier
+        ) {
             console.log(string(abi.encodePacked(zktype, " configuration matches remote, skip update")));
             return;
         }
@@ -215,7 +223,9 @@ contract NitroEnclaveVerifierScript is Script {
         bytes memory proof = vm.parseJsonBytes(proofJson, ".onchain_proof");
         string memory proofType = vm.parseJsonString(proofJson, ".proof_type");
         if (!proofType.eq("Verifier")) {
-            revert(string(abi.encodePacked("Unsupported proof type: ", proofType, ", please use batchVerify() instead.")));
+            revert(
+                string(abi.encodePacked("Unsupported proof type: ", proofType, ", please use batchVerify() instead."))
+            );
         }
         ZkCoProcessorType zkType = _getZkType(vm.parseJsonString(proofJson, ".zktype"));
 

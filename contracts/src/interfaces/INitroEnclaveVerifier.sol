@@ -37,9 +37,9 @@ struct ZkCoProcessorConfig {
  */
 struct VerifierInput {
     // Number of trusted certificates in the chain
-    uint8 trustedCertsPrefixLen;    
+    uint8 trustedCertsPrefixLen;
     // Raw AWS Nitro Enclave attestation report (COSE_Sign1 format)
-    bytes attestationReport;  
+    bytes attestationReport;
 }
 
 /**
@@ -48,23 +48,23 @@ struct VerifierInput {
  */
 struct VerifierJournal {
     // Overall verification result status
-    VerificationResult result; 
+    VerificationResult result;
     // Number of certificates that were trusted during verification
-    uint8 trustedCertsPrefixLen;     
+    uint8 trustedCertsPrefixLen;
     // Attestation timestamp (Unix timestamp in milliseconds)
-    uint64 timestamp;          
+    uint64 timestamp;
     // Array of certificate hashes in the chain (root to leaf)
-    bytes32[] certs;           
+    bytes32[] certs;
     // User-defined data embedded in the attestation
-    bytes userData;            
+    bytes userData;
     // Cryptographic nonce used for replay protection
-    bytes nonce;               
+    bytes nonce;
     // Public key extracted from the attestation
-    bytes publicKey;           
+    bytes publicKey;
     // Platform Configuration Registers (integrity measurements)
-    Pcr[] pcrs;                
+    Pcr[] pcrs;
     // AWS Nitro Enclave module identifier
-    string moduleId;           
+    string moduleId;
 }
 
 /**
@@ -73,9 +73,9 @@ struct VerifierJournal {
  */
 struct BatchVerifierJournal {
     // Verification key that was used for batch verification
-    bytes32 verifierVk;        
+    bytes32 verifierVk;
     // Array of verified attestation results
-    VerifierJournal[] outputs; 
+    VerifierJournal[] outputs;
 }
 
 /**
@@ -83,7 +83,7 @@ struct BatchVerifierJournal {
  * Split into two parts due to Solidity's 32-byte word limitation
  */
 struct Bytes48 {
-    bytes32 first;  
+    bytes32 first;
     bytes16 second;
 }
 
@@ -93,9 +93,9 @@ struct Bytes48 {
  */
 struct Pcr {
     // PCR index number (0-23 for AWS Nitro Enclaves)
-    uint64 index;  
+    uint64 index;
     // 48-byte PCR measurement value (SHA-384 hash)
-    Bytes48 value; 
+    Bytes48 value;
 }
 
 /**
@@ -104,13 +104,13 @@ struct Pcr {
  */
 enum VerificationResult {
     // Attestation successfully verified
-    Success,                     
-    // Root certificate is not in the trusted set 
-    RootCertNotTrusted,          
+    Success,
+    // Root certificate is not in the trusted set
+    RootCertNotTrusted,
     // One or more intermediate certificates are not trusted
-    IntermediateCertsNotTrusted, 
+    IntermediateCertsNotTrusted,
     // Attestation timestamp is outside acceptable range
-    InvalidTimestamp             
+    InvalidTimestamp
 }
 
 /**
@@ -186,6 +186,8 @@ interface INitroEnclaveVerifier {
      */
     event ZkRouteWasFrozen(ZkCoProcessorType indexed zkCoProcessor, bytes4 indexed selector);
 
+    // ============ Query Functions ============
+
     /**
      * @dev Returns the maximum allowed time difference for attestation timestamp validation
      * @return Maximum time difference in seconds between attestation time and current block time
@@ -199,20 +201,68 @@ interface INitroEnclaveVerifier {
     function rootCert() external view returns (bytes32);
 
     /**
-     * @dev Revokes a trusted intermediate certificate
-     * @param _certHash Hash of the certificate to revoke
-     * 
-     * Requirements:
-     * - Only callable by contract owner
-     * - Certificate must exist in the trusted set
+     * @dev Retrieves the configuration for a specific coprocessor
+     * @param _zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
+     * @return ZkCoProcessorConfig Configuration parameters including program IDs and verifier address
      */
-    function revokeCert(bytes32 _certHash) external;
+    function getZkConfig(ZkCoProcessorType _zkCoProcessor) external view returns (ZkCoProcessorConfig memory);
+
+    /**
+     * @dev Returns all supported verifier program IDs for a coprocessor
+     * @param _zkCoProcessor Type of ZK coprocessor
+     * @return Array of all supported verifier program IDs
+     */
+    function getVerifierIds(ZkCoProcessorType _zkCoProcessor) external view returns (bytes32[] memory);
+
+    /**
+     * @dev Returns all supported aggregator program IDs for a coprocessor
+     * @param _zkCoProcessor Type of ZK coprocessor
+     * @return Array of all supported aggregator program IDs
+     */
+    function getAggregatorIds(ZkCoProcessorType _zkCoProcessor) external view returns (bytes32[] memory);
+
+    /**
+     * @dev Checks if a verifier program ID is in the supported set
+     * @param _zkCoProcessor Type of ZK coprocessor
+     * @param _verifierId Verifier program ID to check
+     * @return True if the ID is supported
+     */
+    function isVerifierIdSupported(ZkCoProcessorType _zkCoProcessor, bytes32 _verifierId) external view returns (bool);
+
+    /**
+     * @dev Checks if an aggregator program ID is in the supported set
+     * @param _zkCoProcessor Type of ZK coprocessor
+     * @param _aggregatorId Aggregator program ID to check
+     * @return True if the ID is supported
+     */
+    function isAggregatorIdSupported(ZkCoProcessorType _zkCoProcessor, bytes32 _aggregatorId)
+        external
+        view
+        returns (bool);
+
+    /**
+     * @dev Gets the verifier address for a specific route
+     * @param _zkCoProcessor Type of ZK coprocessor
+     * @param _selector Proof selector
+     * @return Verifier address (route-specific or default fallback)
+     *
+     * Note: Reverts if the route is frozen
+     */
+    function getZkVerifier(ZkCoProcessorType _zkCoProcessor, bytes4 _selector) external view returns (address);
+
+    /**
+     * @dev Returns the verifierProofId for a given verifierId
+     * @param _zkCoProcessor Type of ZK coprocessor
+     * @param _verifierId The verifier program ID
+     * @return The corresponding verifierProofId
+     */
+    function getVerifierProofId(ZkCoProcessorType _zkCoProcessor, bytes32 _verifierId) external view returns (bytes32);
 
     /**
      * @dev Checks how many certificates in each report are trusted
      * @param _report_certs Array of certificate chains, each containing certificate hashes
      * @return Array indicating the number of trusted certificates in each chain
-     * 
+     *
      * For each certificate chain:
      * - Validates that the first certificate matches the root certificate
      * - Counts consecutive trusted certificates starting from the root
@@ -220,10 +270,12 @@ interface INitroEnclaveVerifier {
      */
     function checkTrustedIntermediateCerts(bytes32[][] calldata _report_certs) external view returns (uint8[] memory);
 
+    // ============ Admin Functions ============
+
     /**
      * @dev Sets the trusted root certificate hash
      * @param _rootCert Hash of the new root certificate
-     * 
+     *
      * Requirements:
      * - Only callable by contract owner
      */
@@ -246,50 +298,14 @@ interface INitroEnclaveVerifier {
     ) external;
 
     /**
-     * @dev Retrieves the configuration for a specific coprocessor
-     * @param _zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
-     * @return ZkCoProcessorConfig Configuration parameters including program IDs and verifier address
-     */
-    function getZkConfig(ZkCoProcessorType _zkCoProcessor) external view returns (ZkCoProcessorConfig memory);
-
-    /**
-     * @dev Verifies multiple attestation reports in a single batch operation
-     * @param output Encoded BatchVerifierJournal containing aggregated verification results
-     * @param zkCoprocessor Type of ZK coprocessor used to generate the proof
-     * @param proofBytes Zero-knowledge proof data for batch verification
-     * @return Array of VerifierJournal results, one for each attestation in the batch
-     * 
-     * This function:
-     * 1. Verifies the ZK proof using the specified coprocessor
-     * 2. Decodes the batch verification results
-     * 3. Validates each attestation's certificate chain and timestamp
-     * 4. Caches newly discovered trusted certificates
-     * 5. Returns the verification results for all attestations
-     */
-    function batchVerify(bytes calldata output, ZkCoProcessorType zkCoprocessor, bytes calldata proofBytes)
-        external
-        returns (VerifierJournal[] memory);
-
-    /**
-     * @dev Verifies a single attestation report using zero-knowledge proof
-     * @param output Encoded VerifierJournal containing the verification result
-     * @param zkCoprocessor Type of ZK coprocessor used to generate the proof
-     * @param proofBytes Zero-knowledge proof data for the attestation
-     * @return VerifierJournal containing the verification result and extracted data
+     * @dev Revokes a trusted intermediate certificate
+     * @param _certHash Hash of the certificate to revoke
      *
-     * This function:
-     * 1. Verifies the ZK proof using the specified coprocessor
-     * 2. Decodes the verification result
-     * 3. Validates the certificate chain against trusted certificates
-     * 4. Checks timestamp validity within the allowed time difference
-     * 5. Caches newly discovered trusted certificates
-     * 6. Returns the complete verification result
+     * Requirements:
+     * - Only callable by contract owner
+     * - Certificate must exist in the trusted set
      */
-    function verify(bytes calldata output, ZkCoProcessorType zkCoprocessor, bytes calldata proofBytes)
-        external
-        returns (VerifierJournal memory);
-
-    // ============ Version Management Functions ============
+    function revokeCert(bytes32 _certHash) external;
 
     /**
      * @dev Updates the verifier program ID, adding the new version to the supported set
@@ -301,11 +317,8 @@ interface INitroEnclaveVerifier {
      * - Only callable by contract owner
      * - New ID must be different from current latest
      */
-    function updateVerifierId(
-        ZkCoProcessorType _zkCoProcessor,
-        bytes32 _newVerifierId,
-        bytes32 _newVerifierProofId
-    ) external;
+    function updateVerifierId(ZkCoProcessorType _zkCoProcessor, bytes32 _newVerifierId, bytes32 _newVerifierProofId)
+        external;
 
     /**
      * @dev Updates the aggregator program ID, adding the new version to the supported set
@@ -342,46 +355,6 @@ interface INitroEnclaveVerifier {
      */
     function removeAggregatorId(ZkCoProcessorType _zkCoProcessor, bytes32 _aggregatorId) external;
 
-    // ============ Query Functions ============
-
-    /**
-     * @dev Returns all supported verifier program IDs for a coprocessor
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @return Array of all supported verifier program IDs
-     */
-    function getVerifierIds(ZkCoProcessorType _zkCoProcessor) external view returns (bytes32[] memory);
-
-    /**
-     * @dev Returns all supported aggregator program IDs for a coprocessor
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @return Array of all supported aggregator program IDs
-     */
-    function getAggregatorIds(ZkCoProcessorType _zkCoProcessor) external view returns (bytes32[] memory);
-
-    /**
-     * @dev Checks if a verifier program ID is in the supported set
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _verifierId Verifier program ID to check
-     * @return True if the ID is supported
-     */
-    function isVerifierIdSupported(ZkCoProcessorType _zkCoProcessor, bytes32 _verifierId)
-        external
-        view
-        returns (bool);
-
-    /**
-     * @dev Checks if an aggregator program ID is in the supported set
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _aggregatorId Aggregator program ID to check
-     * @return True if the ID is supported
-     */
-    function isAggregatorIdSupported(ZkCoProcessorType _zkCoProcessor, bytes32 _aggregatorId)
-        external
-        view
-        returns (bool);
-
-    // ============ Route Management Functions ============
-
     /**
      * @dev Adds a route-specific verifier override
      * @param _zkCoProcessor Type of ZK coprocessor
@@ -408,15 +381,44 @@ interface INitroEnclaveVerifier {
      */
     function freezeVerifyRoute(ZkCoProcessorType _zkCoProcessor, bytes4 _selector) external;
 
+    // ============ Verification Functions ============
+
     /**
-     * @dev Gets the verifier address for a specific route
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _selector Proof selector
-     * @return Verifier address (route-specific or default fallback)
+     * @dev Verifies a single attestation report using zero-knowledge proof
+     * @param output Encoded VerifierJournal containing the verification result
+     * @param zkCoprocessor Type of ZK coprocessor used to generate the proof
+     * @param proofBytes Zero-knowledge proof data for the attestation
+     * @return VerifierJournal containing the verification result and extracted data
      *
-     * Note: Reverts if the route is frozen
+     * This function:
+     * 1. Verifies the ZK proof using the specified coprocessor
+     * 2. Decodes the verification result
+     * 3. Validates the certificate chain against trusted certificates
+     * 4. Checks timestamp validity within the allowed time difference
+     * 5. Caches newly discovered trusted certificates
+     * 6. Returns the complete verification result
      */
-    function getZkVerifier(ZkCoProcessorType _zkCoProcessor, bytes4 _selector) external view returns (address);
+    function verify(bytes calldata output, ZkCoProcessorType zkCoprocessor, bytes calldata proofBytes)
+        external
+        returns (VerifierJournal memory);
+
+    /**
+     * @dev Verifies multiple attestation reports in a single batch operation
+     * @param output Encoded BatchVerifierJournal containing aggregated verification results
+     * @param zkCoprocessor Type of ZK coprocessor used to generate the proof
+     * @param proofBytes Zero-knowledge proof data for batch verification
+     * @return Array of VerifierJournal results, one for each attestation in the batch
+     *
+     * This function:
+     * 1. Verifies the ZK proof using the specified coprocessor
+     * 2. Decodes the batch verification results
+     * 3. Validates each attestation's certificate chain and timestamp
+     * 4. Caches newly discovered trusted certificates
+     * 5. Returns the verification results for all attestations
+     */
+    function batchVerify(bytes calldata output, ZkCoProcessorType zkCoprocessor, bytes calldata proofBytes)
+        external
+        returns (VerifierJournal[] memory);
 
     // ============ Explicit Program ID Verification Functions ============
 
@@ -456,15 +458,4 @@ interface INitroEnclaveVerifier {
         bytes32 verifierId,
         bytes calldata proofBytes
     ) external returns (VerifierJournal[] memory);
-
-    /**
-     * @dev Returns the verifierProofId for a given verifierId
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _verifierId The verifier program ID
-     * @return The corresponding verifierProofId
-     */
-    function getVerifierProofId(ZkCoProcessorType _zkCoProcessor, bytes32 _verifierId)
-        external
-        view
-        returns (bytes32);
 }

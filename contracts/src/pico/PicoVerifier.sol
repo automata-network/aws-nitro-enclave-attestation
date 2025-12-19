@@ -13,9 +13,7 @@ contract PicoVerifier is Verifier, IPicoVerifier {
 
     /// @notice Hashes the public values to a field elements inside Bn254.
     /// @param publicValues The public values.
-    function hashPublicValues(
-        bytes calldata publicValues
-    ) public pure returns (bytes32) {
+    function hashPublicValues(bytes calldata publicValues) public pure returns (bytes32) {
         return sha256(publicValues) & bytes32(uint256((1 << 253) - 1));
     }
 
@@ -23,11 +21,7 @@ contract PicoVerifier is Verifier, IPicoVerifier {
     /// @param riscvVkey The verification key for the RISC-V program.
     /// @param publicValues The public values encoded as bytes.
     /// @param proof The proof of the riscv program execution in the Pico.
-    function verifyPicoProof(
-        bytes32 riscvVkey,
-        bytes calldata publicValues,
-        uint256[8] calldata proof
-    ) external view {
+    function verifyPicoProof(bytes32 riscvVkey, bytes calldata publicValues, uint256[8] calldata proof) external view {
         bytes32 publicValuesDigest = hashPublicValues(publicValues);
         uint256[2] memory inputs;
         inputs[0] = uint256(riscvVkey);

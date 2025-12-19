@@ -25,11 +25,7 @@ contract MultiChainSetZkConfigScript is NitroEnclaveVerifierScript {
         return vm.readFile(configPath);
     }
 
-    function getChainConfig(string memory config, string memory chainName)
-        internal
-        pure
-        returns (ChainConfig memory)
-    {
+    function getChainConfig(string memory config, string memory chainName) internal pure returns (ChainConfig memory) {
         string memory basePath = string(abi.encodePacked(".chains.", chainName));
 
         ChainConfig memory chainConfig;
@@ -41,11 +37,7 @@ contract MultiChainSetZkConfigScript is NitroEnclaveVerifierScript {
         return chainConfig;
     }
 
-    function getDeploymentConfig(string memory config)
-        internal
-        pure
-        returns (DeploymentConfig memory)
-    {
+    function getDeploymentConfig(string memory config) internal pure returns (DeploymentConfig memory) {
         DeploymentConfig memory deployConfig;
         deployConfig.sp1ProgramId = config.readString(".deployment.sp1ProgramId");
         deployConfig.risc0ProgramId = config.readString(".deployment.risc0ProgramId");
