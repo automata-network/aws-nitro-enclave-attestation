@@ -380,7 +380,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * @param output Encoded VerifierJournal containing the verification result
      * @param zkCoprocessor Type of ZK coprocessor used to generate the proof
      * @param proofBytes Zero-knowledge proof data for the attestation
-     * @return VerifierJournal containing the verification result and extracted data
+     * @return journal VerifierJournal containing the verification result and extracted data
      *
      * This function performs end-to-end verification of a single attestation:
      * 1. Retrieves the single verification program ID from configuration
@@ -398,13 +398,13 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      */
     function verify(bytes calldata output, ZkCoProcessorType zkCoprocessor, bytes calldata proofBytes)
         external
-        returns (VerifierJournal memory)
+        returns (VerifierJournal memory journal)
     {
         bytes32 programId = zkConfig[zkCoprocessor].verifierId;
         _verifyZk(zkCoprocessor, programId, output, proofBytes);
-        VerifierJournal memory journal = abi.decode(output, (VerifierJournal));
+        journal = abi.decode(output, (VerifierJournal));
         journal = _verifyJournal(journal);
-        return journal;
+        emit AttestationSubmitted(journal.result, zkCoprocessor, output);
     }
 
     /**
@@ -412,7 +412,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * @param output Encoded BatchVerifierJournal containing aggregated verification results
      * @param zkCoprocessor Type of ZK coprocessor used to generate the proof
      * @param proofBytes Zero-knowledge proof data for batch verification
-     * @return Array of VerifierJournal results, one for each attestation in the batch
+     * @return results Array of VerifierJournal results, one for each attestation in the batch
      *
      * This function provides gas-efficient batch verification by:
      * 1. Using the aggregator program ID for ZK proof verification
@@ -425,7 +425,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      */
     function batchVerify(bytes calldata output, ZkCoProcessorType zkCoprocessor, bytes calldata proofBytes)
         external
-        returns (VerifierJournal[] memory)
+        returns (VerifierJournal[] memory results)
     {
         bytes32 aggregatorId = zkConfig[zkCoprocessor].aggregatorId;
         bytes32 verifierId = zkConfig[zkCoprocessor].verifierId;
@@ -436,11 +436,12 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         if (batchJournal.verifierVk != verifierProofId) {
             revert("Verifier VK does not match the expected verifier proof ID");
         }
-        for (uint256 i = 0; i < batchJournal.outputs.length; i++) {
-            batchJournal.outputs[i] = _verifyJournal(batchJournal.outputs[i]);
+        uint256 n = batchJournal.outputs.length;
+        results = new VerifierJournal[](n);
+        for (uint256 i = 0; i < n; i++) {
+            results[i] = _verifyJournal(batchJournal.outputs[i]);
         }
-
-        return batchJournal.outputs;
+        emit BatchAttestationSubmitted(verifierId, zkCoprocessor, abi.encode(results));
     }
 
     // ============ Explicit Program ID Verification Functions ============
@@ -451,23 +452,23 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * @param zkCoprocessor Type of ZK coprocessor used to generate the proof
      * @param programId Explicit verifier program ID to use (must be in supported set)
      * @param proofBytes Zero-knowledge proof data for the attestation
-     * @return VerifierJournal containing the verification result and extracted data
+     * @return journal VerifierJournal containing the verification result and extracted data
      */
     function verifyWithProgramId(
         bytes calldata output,
         ZkCoProcessorType zkCoprocessor,
         bytes32 programId,
         bytes calldata proofBytes
-    ) external returns (VerifierJournal memory) {
+    ) external returns (VerifierJournal memory journal) {
         // Validate program ID is in the supported set
         if (!_verifierIdSet[zkCoprocessor].contains(programId)) {
             revert InvalidProgramIdentifier(zkCoprocessor, programId);
         }
 
         _verifyZk(zkCoprocessor, programId, output, proofBytes);
-        VerifierJournal memory journal = abi.decode(output, (VerifierJournal));
+        journal = abi.decode(output, (VerifierJournal));
         journal = _verifyJournal(journal);
-        return journal;
+        emit AttestationSubmitted(journal.result, zkCoprocessor, output);
     }
 
     /**
@@ -477,7 +478,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * @param aggregatorId Explicit aggregator program ID to use
      * @param verifierId The verifier program ID (contract looks up corresponding verifierProofId)
      * @param proofBytes Zero-knowledge proof data for batch verification
-     * @return Array of VerifierJournal results, one for each attestation in the batch
+     * @return results Array of VerifierJournal results, one for each attestation in the batch
      */
     function batchVerifyWithProgramId(
         bytes calldata output,
@@ -485,7 +486,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         bytes32 aggregatorId,
         bytes32 verifierId,
         bytes calldata proofBytes
-    ) external returns (VerifierJournal[] memory) {
+    ) external returns (VerifierJournal[] memory results) {
         // Validate aggregator ID is in the supported set
         if (!_aggregatorIdSet[zkCoprocessor].contains(aggregatorId)) {
             revert InvalidProgramIdentifier(zkCoprocessor, aggregatorId);
@@ -504,11 +505,12 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
             revert("Verifier VK does not match the expected verifier proof ID");
         }
 
-        for (uint256 i = 0; i < batchJournal.outputs.length; i++) {
-            batchJournal.outputs[i] = _verifyJournal(batchJournal.outputs[i]);
+        uint256 n = batchJournal.outputs.length;
+        results = new VerifierJournal[](n);
+        for (uint256 i = 0; i < n; i++) {
+            results[i] = _verifyJournal(batchJournal.outputs[i]);
         }
-
-        return batchJournal.outputs;
+        emit BatchAttestationSubmitted(verifierId, zkCoprocessor, abi.encode(results));
     }
 
     // ============ Internal Functions ============

@@ -186,6 +186,17 @@ interface INitroEnclaveVerifier {
      */
     event ZkRouteWasFrozen(ZkCoProcessorType indexed zkCoProcessor, bytes4 indexed selector);
 
+    /**
+     * @dev Emitted when the proof of attestation has been successfully verified
+     */
+    event AttestationSubmitted(VerificationResult result, ZkCoProcessorType zkCoProcessor, bytes output);
+
+    /**
+     * @dev Emitted when a batched proof has been successfully verified
+     * @dev encodedBatched = abi.encode(VerifierJournal[])
+     */
+    event BatchAttestationSubmitted(bytes32 verifierId, ZkCoProcessorType zkCoProcessor, bytes encodedBatch);
+
     // ============ Query Functions ============
 
     /**
