@@ -18,7 +18,8 @@ contract NitroEnclaveVerifierScript is Script {
     using LibString for string;
     using LibString for uint256;
 
-    function setUp() public {}
+    address internal constant owner = 0xC9b9010654694AF1aa538d108e2140E318Fa78fF;
+    bytes32 internal constant NITRO_ENCLAVE_VERIFIER_SALT = keccak256("NITRO_ENCLAVE_VERIFIER_SALT");
 
     function readDeployed(string memory key) internal view returns (address) {
         address addr = vm.envOr(key, address(0));
@@ -75,7 +76,7 @@ contract NitroEnclaveVerifierScript is Script {
     }
 
     function deploySP1Verifier() public {
-        vm.startBroadcast();
+        vm.startBroadcast(owner);
         SP1Verifier sp1Verifier = new SP1Verifier();
         vm.stopBroadcast();
         require(address(sp1Verifier).code.length > 0, "SP1Verifier deployment failed");
@@ -84,7 +85,7 @@ contract NitroEnclaveVerifierScript is Script {
     }
 
     function deployRisc0Verifier() public {
-        vm.startBroadcast();
+        vm.startBroadcast(owner);
         RiscZeroGroth16Verifier risc0Verifier =
             new RiscZeroGroth16Verifier(ControlID.CONTROL_ROOT, ControlID.BN254_CONTROL_ID);
         vm.stopBroadcast();
@@ -135,8 +136,9 @@ contract NitroEnclaveVerifierScript is Script {
             return false;
         }
 
-        vm.startBroadcast();
-        NitroEnclaveVerifier verifier = new NitroEnclaveVerifier(msg.sender, maxTimeDiff, new bytes32[](0));
+        vm.startBroadcast(owner);
+        NitroEnclaveVerifier verifier =
+            new NitroEnclaveVerifier{salt: NITRO_ENCLAVE_VERIFIER_SALT}(owner, maxTimeDiff, new bytes32[](0));
         vm.stopBroadcast();
         require(address(verifier).code.length > 0, "NitroEnclaveVerifier deployment failed");
         console.log("NitroEnclaveVerifier deployed at", address(verifier));
@@ -156,7 +158,7 @@ contract NitroEnclaveVerifierScript is Script {
     function setRootCert(string memory path) public {
         INitroEnclaveVerifier verifier = INitroEnclaveVerifier(readDeployed("VERIFIER"));
         bytes memory _rootCert = vm.readFileBinary(path);
-        vm.startBroadcast();
+        vm.startBroadcast(owner);
         verifier.setRootCert(sha256(_rootCert));
         vm.stopBroadcast();
         console.log("Root certificate set to");
@@ -212,7 +214,7 @@ contract NitroEnclaveVerifierScript is Script {
         }
 
         console.log(string(abi.encodePacked(zktype, " configuration differs, updating...")));
-        vm.startBroadcast();
+        vm.startBroadcast(owner);
         verifier.setZkConfiguration(zkType, config, verifierProofId);
         vm.stopBroadcast();
     }
