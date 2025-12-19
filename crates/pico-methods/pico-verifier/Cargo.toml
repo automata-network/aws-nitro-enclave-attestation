@@ -1,0 +1,10 @@
+[package]
+name = "pico-verifier"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+pico-sdk = { git = "https://github.com/brevis-network/pico.git", tag = "v1.1.8" }
+aws-nitro-enclave-attestation-verifier = { path = "../../verifier", features = ["pico"] }

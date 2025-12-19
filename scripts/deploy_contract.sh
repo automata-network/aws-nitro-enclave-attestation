@@ -2,14 +2,31 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/auth_utils.sh"
+
+# Set KEYSTORE_PATH externally if using keystore authentication
+# e.g., KEYSTORE_PATH=~/.foundry/keystores/deployer.json ./deploy_contract.sh
+KEYSTORE_PATH="${KEYSTORE_PATH:-}"
+
+# Resolve keystore path to absolute if relative
+if [ -n "$KEYSTORE_PATH" ] && [[ "$KEYSTORE_PATH" != /* ]]; then
+    KEYSTORE_PATH="$(pwd)/$KEYSTORE_PATH"
+fi
+
 function _cli() {
     target/debug/nitro-attest-cli "$@"
 }
 
 function _script() {
+    # Setup auth if not already configured
+    if [ -z "$AUTH_FLAGS" ]; then
+        setup_auth "$KEYSTORE_PATH"
+    fi
+
     cd contracts
     unset VERIFIER
-    forge script ./script/NitroEnclaveVerifier.s.sol --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY --sig "$@"
+    forge script ./script/NitroEnclaveVerifier.s.sol --broadcast --rpc-url $RPC_URL $AUTH_FLAGS --sig "$@"
     cd ../
 }
 

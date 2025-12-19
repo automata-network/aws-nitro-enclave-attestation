@@ -5,6 +5,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONTRACTS_DIR="$PROJECT_ROOT/contracts"
+ORIGINAL_DIR="$(pwd)"
+
+source "$SCRIPT_DIR/auth_utils.sh"
 
 cd "$CONTRACTS_DIR"
 
@@ -18,12 +21,16 @@ Options:
     -c, --chain CHAIN_NAME          Deploy to a specific chain (e.g., sepolia, base, arbitrum)
     -m, --multiple CHAIN1,CHAIN2    Deploy to multiple specific chains (comma-separated)
     -a, --all                       Deploy to all chains in deploy-config.json
+    -k, --keystore PATH             Use keystore file for authentication
     -l, --list                      List all available chains
     -d, --dry-run                   Simulate deployment without broadcasting transactions
     -h, --help                      Show this help message
 
+Authentication (one required):
+    PRIVATE_KEY                     Private key for deployment (environment variable)
+    --keystore PATH                 Path to keystore file (forge will prompt for password)
+
 Environment Variables:
-    PRIVATE_KEY                     Private key for deployment (required)
     ETHERSCAN_API_KEY              API key for contract verification (optional)
 
 Examples:
@@ -42,6 +49,9 @@ Examples:
     # Dry run deployment
     $0 --chain sepolia --dry-run
 
+    # Deploy using keystore
+    $0 --chain sepolia --keystore ~/.foundry/keystores/deployer.json
+
 EOF
 }
 
@@ -57,8 +67,8 @@ list_chains() {
     chains=$(jq -r '.chains | keys[]' deploy-config.json)
     
     for chain in $chains; do
-        chain_id=$(jq -r ".chains.${chain}.chainId" deploy-config.json)
-        rpc=$(jq -r ".chains.${chain}.rpc" deploy-config.json)
+        chain_id=$(jq -r ".chains[\"${chain}\"].chainId" deploy-config.json)
+        rpc=$(jq -r ".chains[\"${chain}\"].rpc" deploy-config.json)
         echo "  - $chain (Chain ID: $chain_id)"
         echo "    RPC: $rpc"
     done
@@ -67,12 +77,6 @@ list_chains() {
 }
 
 check_requirements() {
-    if [ -z "$PRIVATE_KEY" ]; then
-        echo "Error: PRIVATE_KEY environment variable is not set"
-        echo "Please set it with: export PRIVATE_KEY=your_private_key"
-        exit 1
-    fi
-    
     if ! command -v forge &> /dev/null; then
         echo "Error: forge command not found. Please install Foundry:"
         echo "https://getfoundry.sh/"
@@ -104,19 +108,19 @@ deploy_to_chain() {
         '$chain_name'"
     
     if [ "$dry_run" != "true" ]; then
-        cmd="$cmd --broadcast --private-key $PRIVATE_KEY"
-        
+        cmd="$cmd --broadcast $AUTH_FLAGS"
+
         if [ -n "$ETHERSCAN_API_KEY" ]; then
             cmd="$cmd --verify --etherscan-api-key $ETHERSCAN_API_KEY"
         fi
     fi
-    
+
     eval $cmd
-    
+
     if [ $? -eq 0 ]; then
-        echo "✅ Successfully deployed to $chain_name"
+        echo "Successfully deployed to $chain_name"
     else
-        echo "❌ Failed to deploy to $chain_name"
+        echo "Failed to deploy to $chain_name"
         return 1
     fi
 }
@@ -144,21 +148,22 @@ deploy_to_all_chains() {
     
     local cmd="forge script script/MultiChainDeploy.s.sol:MultiChainDeployScript \
         --sig 'deployAll()'"
-    
+
     if [ "$dry_run" != "true" ]; then
-        cmd="$cmd --broadcast --private-key $PRIVATE_KEY"
-        
+        cmd="$cmd --broadcast $AUTH_FLAGS"
+
         if [ -n "$ETHERSCAN_API_KEY" ]; then
             cmd="$cmd --verify --etherscan-api-key $ETHERSCAN_API_KEY"
         fi
     fi
-    
+
     eval $cmd
 }
 
 CHAIN_NAME=""
 MULTIPLE_CHAINS=""
 DEPLOY_ALL=false
+KEYSTORE_PATH=""
 DRY_RUN=false
 LIST_CHAINS=false
 
@@ -175,6 +180,10 @@ while [[ $# -gt 0 ]]; do
         -a|--all)
             DEPLOY_ALL=true
             shift
+            ;;
+        -k|--keystore)
+            KEYSTORE_PATH="$2"
+            shift 2
             ;;
         -l|--list)
             LIST_CHAINS=true
@@ -196,6 +205,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Resolve keystore path to absolute (relative to original directory)
+if [ -n "$KEYSTORE_PATH" ] && [[ "$KEYSTORE_PATH" != /* ]]; then
+    KEYSTORE_PATH="$ORIGINAL_DIR/$KEYSTORE_PATH"
+fi
+
 if [ "$LIST_CHAINS" = true ]; then
     list_chains
     exit 0
@@ -209,9 +223,10 @@ if [ -z "$CHAIN_NAME" ] && [ -z "$MULTIPLE_CHAINS" ] && [ "$DEPLOY_ALL" = false 
 fi
 
 check_requirements
+setup_auth "$KEYSTORE_PATH"
 
 if [ "$DRY_RUN" = true ]; then
-    echo "🔍 DRY RUN MODE - No transactions will be broadcasted"
+    echo "DRY RUN MODE - No transactions will be broadcasted"
     echo ""
 fi
 

@@ -10,7 +10,7 @@ use alloy_primitives::Bytes;
 use anyhow::{anyhow, bail, Context};
 use aws_nitro_enclave_attestation_verifier::{
     stub::{
-        BatchVerifierInput, BatchVerifierJournal, VerifierInput, VerifierJournal, ZkCoProcessorType,
+        BatchVerifierJournal, VerifierInput, VerifierJournal, ZkCoProcessorType,
     },
     AttestationReport,
 };
@@ -71,6 +71,21 @@ impl ProverConfig {
         }
     }
 
+    #[cfg(feature = "pico")]
+    pub fn pico() -> Self {
+        Self::pico_with(Default::default())
+    }
+
+    #[cfg(feature = "pico")]
+    pub fn pico_with(cfg: crate::program_pico::PicoProverConfig) -> Self {
+        Self {
+            default_trusted_certs_prefix_length: Self::default_trusted_certs_prefix_length(),
+            skip_time_validity_check: Self::skip_time_validity_check(),
+            skip_contract_program_id_check: Self::skip_contract_program_id_check(),
+            system: ProverSystemConfig::Pico(cfg),
+        }
+    }
+
     fn default_trusted_certs_prefix_length() -> u8 {
         std::env::var("DEFAULT_TRUSTED_CERTS_PREFIX_LENGTH")
             .ok()
@@ -99,6 +114,8 @@ pub enum ProverSystemConfig {
     Succinct(crate::program_sp1::SP1ProverConfig),
     #[cfg(feature = "risc0")]
     RiscZero(crate::program_risc0::RiscZeroProverConfig),
+    #[cfg(feature = "pico")]
+    Pico(crate::program_pico::PicoProverConfig),
 }
 
 /// AWS Nitro Enclave attestation prover using zero-knowledge proofs.
@@ -225,7 +242,7 @@ pub struct NitroEnclaveProver {
     /// ZK program for verifying individual attestation reports
     pub verifier: Box<dyn Program<Input = VerifierInput, Output = VerifierJournal>>,
     /// ZK program for aggregating multiple proofs into a single proof
-    pub aggregator: Box<dyn Program<Input = BatchVerifierInput, Output = BatchVerifierJournal>>,
+    pub aggregator: Box<dyn Program<Input = BatchVerifierJournal, Output = BatchVerifierJournal>>,
 }
 
 impl NitroEnclaveProver {
@@ -278,21 +295,54 @@ impl NitroEnclaveProver {
             #[cfg(feature = "risc0")]
             ProverSystemConfig::RiscZero(system_cfg) => {
                 use crate::program_risc0::{RISC0_PROGRAM_AGGREGATOR, RISC0_PROGRAM_VERIFIER};
-                if let Some(api_url) = &system_cfg.api_url {
-                    std::env::set_var("BONSAI_API_URL", api_url);
+
+                // Set Boundless environment variables
+                if let Some(rpc_url) = &system_cfg.rpc_url {
+                    std::env::set_var("BOUNDLESS_RPC_URL", rpc_url);
                 }
-                if let Some(api_key) = &system_cfg.api_key {
-                    std::env::set_var("BONSAI_API_KEY", api_key);
+                if let Some(private_key) = &system_cfg.private_key {
+                    std::env::set_var("BOUNDLESS_PRIVATE_KEY", private_key);
                 }
+                if let Some(program_url) = &system_cfg.verifier_program_url {
+                    std::env::set_var("BOUNDLESS_VERIFIER_PROGRAM_URL", program_url);
+                }
+                if let Some(program_url) = &system_cfg.aggregator_program_url {
+                    std::env::set_var("BOUNDLESS_AGGREGATOR_PROGRAM_URL", program_url);
+                }
+                if let Some(min_price) = system_cfg.min_price {
+                    std::env::set_var("BOUNDLESS_MIN_PRICE", min_price.to_string());
+                }
+                if let Some(max_price) = system_cfg.max_price {
+                    std::env::set_var("BOUNDLESS_MAX_PRICE", max_price.to_string());
+                }
+                if let Some(timeout) = system_cfg.timeout {
+                    std::env::set_var("BOUNDLESS_TIMEOUT", timeout.to_string());
+                }
+                if let Some(ramp_up_period) = system_cfg.ramp_up_period {
+                    std::env::set_var("BOUNDLESS_RAMP_UP_PERIOD", ramp_up_period.to_string());
+                }
+
                 NitroEnclaveProver {
                     contract,
-                    remote_prover_config: system_cfg
-                        .clone()
-                        .try_into()
-                        .map_err(|err| format!("{:?}", err)),
+                    // RISC0 uses storage_provider_from_env() for uploads, not RemoteProverConfig
+                    remote_prover_config: Ok(RemoteProverConfig {
+                        api_url: system_cfg.rpc_url.clone(),
+                        api_key: system_cfg.private_key.clone().unwrap_or_default(),
+                    }),
                     cfg,
                     verifier: Box::new(RISC0_PROGRAM_VERIFIER.clone()),
                     aggregator: Box::new(RISC0_PROGRAM_AGGREGATOR.clone()),
+                }
+            }
+            #[cfg(feature = "pico")]
+            ProverSystemConfig::Pico(_) => {
+                use crate::program_pico::{PICO_PROGRAM_AGGREGATOR, PICO_PROGRAM_VERIFIER};
+                NitroEnclaveProver {
+                    contract,
+                    remote_prover_config: Err("Remote prover is not supported for Pico".to_string()),
+                    cfg,
+                    verifier: Box::new(PICO_PROGRAM_VERIFIER.clone()),
+                    aggregator: Box::new(PICO_PROGRAM_AGGREGATOR.clone()),
                 }
             }
         }
@@ -457,7 +507,7 @@ impl NitroEnclaveProver {
             encoded_proofs.push(&item.encoded_proof);
         }
 
-        let batch_input = BatchVerifierInput {
+        let batch_input = BatchVerifierJournal {
             verifierVk: self.verifier.verify_proof_id(),
             outputs: journals,
         };
@@ -616,10 +666,14 @@ impl NitroEnclaveProver {
             Some(verifier_contract) => {
                 // make sure the zk config aligned
                 let zk_config = block_on(verifier_contract.zk_config(self.verifier.zktype()))?;
+                let verifier_proof_id = block_on(verifier_contract.get_verifier_proof_id(
+                    self.verifier.zktype(),
+                    zk_config.verifierId,
+                ))?;
                 max_time_diff = block_on(verifier_contract.max_time_diff())?;
 
                 let program_id = self.get_program_id();
-                let verify_result = program_id.verify(&zk_config).with_context(|| {
+                let verify_result = program_id.verify(&zk_config, verifier_proof_id).with_context(|| {
                     format!("Failed to verify zkconfig for {:?}", self.verifier.zktype())
                 });
                 if let Err(verify_err) = verify_result {

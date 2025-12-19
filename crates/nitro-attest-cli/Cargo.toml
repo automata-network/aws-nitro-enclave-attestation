@@ -9,6 +9,7 @@ license.workspace = true
 default = ["risc0", "sp1"]
 sp1 = ["aws-nitro-enclave-attestation-prover/sp1"]
 risc0 = ["aws-nitro-enclave-attestation-prover/risc0"]
+pico = ["aws-nitro-enclave-attestation-prover/pico"]
 
 [dependencies]
 clap.workspace = true
@@ -20,3 +21,4 @@ alloy-primitives.workspace = true
 tracing-subscriber.workspace = true
 log.workspace = true
 tracing.workspace = true
+dotenvy.workspace = true

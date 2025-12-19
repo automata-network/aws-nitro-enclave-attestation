@@ -31,32 +31,24 @@ contract MultiChainDeployScript is NitroEnclaveVerifierScript {
         return vm.readFile(configPath);
     }
 
-    function getChainConfig(string memory config, string memory chainName) 
-        internal 
-        pure 
-        returns (ChainConfig memory) 
-    {
+    function getChainConfig(string memory config, string memory chainName) internal pure returns (ChainConfig memory) {
         string memory basePath = string(abi.encodePacked(".chains.", chainName));
-        
+
         ChainConfig memory chainConfig;
         chainConfig.name = chainName;
         chainConfig.chainId = config.readUint(string(abi.encodePacked(basePath, ".chainId")));
         chainConfig.rpc = config.readString(string(abi.encodePacked(basePath, ".rpc")));
         chainConfig.explorer = config.readString(string(abi.encodePacked(basePath, ".explorer")));
-        
+
         return chainConfig;
     }
 
-    function getDeploymentConfig(string memory config) 
-        internal 
-        pure 
-        returns (DeploymentConfig memory) 
-    {
+    function getDeploymentConfig(string memory config) internal pure returns (DeploymentConfig memory) {
         DeploymentConfig memory deployConfig;
         deployConfig.rootCert = config.readString(".deployment.rootCert");
         deployConfig.sp1ProgramId = config.readString(".deployment.sp1ProgramId");
         deployConfig.risc0ProgramId = config.readString(".deployment.risc0ProgramId");
-        
+
         return deployConfig;
     }
 
@@ -65,17 +57,13 @@ contract MultiChainDeployScript is NitroEnclaveVerifierScript {
         view
         returns (address)
     {
-        string memory path = string(abi.encodePacked(
-            ".verifiers.",
-            verifierType,
-            ".deployments.",
-            vm.toString(chainId)
-        ));
-        
+        string memory path =
+            string(abi.encodePacked(".verifiers.", verifierType, ".deployments.", vm.toString(chainId)));
+
         if (!vm.keyExistsJson(config, path)) {
             return address(0);
         }
-        
+
         return config.readAddress(path);
     }
 
@@ -95,7 +83,6 @@ contract MultiChainDeployScript is NitroEnclaveVerifierScript {
 
         address sp1Verifier = getVerifierAddress(config, "sp1", chainConfig.chainId);
         address risc0Verifier = getVerifierAddress(config, "risc0", chainConfig.chainId);
-
 
         if (sp1Verifier != address(0)) {
             console.log("Using existing SP1 Verifier from config:", sp1Verifier);
@@ -137,7 +124,10 @@ contract MultiChainDeployScript is NitroEnclaveVerifierScript {
         console.log("==================================================");
         console.log("Deployment completed for", chainName);
         console.log("NitroEnclaveVerifier:", readDeployed("VERIFIER"));
-        console.log("Explorer:", string(abi.encodePacked(chainConfig.explorer, "/address/", vm.toString(readDeployed("VERIFIER")))));
+        console.log(
+            "Explorer:",
+            string(abi.encodePacked(chainConfig.explorer, "/address/", vm.toString(readDeployed("VERIFIER"))))
+        );
         console.log("==================================================\n");
     }
 
@@ -151,12 +141,12 @@ contract MultiChainDeployScript is NitroEnclaveVerifierScript {
     function deployAll() public {
         string memory config = loadConfig();
         string[] memory keys = vm.parseJsonKeys(config, ".chains");
-        
+
         console.log("Found", keys.length, "chains in configuration");
         console.log("Starting multi-chain deployment...\n");
-        
+
         deployToMultipleChains(keys);
-        
+
         console.log("Multi-chain deployment finished!");
     }
 }

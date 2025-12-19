@@ -2158,8 +2158,6 @@ dependencies = [
 name = "sp1-verifier"
 version = "0.1.0"
 dependencies = [
- "alloy-primitives",
- "alloy-sol-types",
  "aws-nitro-enclave-attestation-verifier",
  "sp1-zkvm",
 ]

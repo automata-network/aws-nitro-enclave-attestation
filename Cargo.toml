@@ -7,6 +7,7 @@ members = [
     "crates/x509-verifier-rust-crypto",
     "crates/risc0-methods",
     "crates/sp1-methods",
+    "crates/pico-methods",
 ]
 default-members = [
     "crates/nitro-attest-cli",
@@ -29,7 +30,7 @@ opt-level = 3
 
 [profile.release]
 debug = 1
-lto = true
+lto = "thin"
 
 [workspace.dependencies]
 aws-nitro-enclave-attestation-verifier = { path = "crates/verifier" }
@@ -37,6 +38,7 @@ aws-nitro-enclave-attestation-prover = { path = "crates/prover", default-feature
 x509-verifier-rust-crypto = { path = "crates/x509-verifier-rust-crypto" }
 risc0-methods = { path = "crates/risc0-methods" }
 sp1-methods = { path = "crates/sp1-methods" }
+pico-methods = { path = "crates/pico-methods" }
 
 clap = { version = "4.0", features = ["derive", "env"] }
 anyhow = { version = "1", features = ["backtrace"] }
@@ -48,10 +50,14 @@ serde_with = { version = "1.9.4", default-features = false }
 serde_bytes = "0.11"
 
 risc0-zkvm = { version = "^3.0.3", default-features = false }
-bonsai-sdk = { version = "1.4.0", features = ["non_blocking"] }
+boundless-market = "1.1.0"
 risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", tag = "v3.0.1" }
 
 sp1-sdk = { version = "^5.0.0", default-features = false, features = ["network"] }
+
+pico-sdk = { git = "https://github.com/automata-network/pico.git", branch = "evm_defer_proof" }
+pico-vm = { git = "https://github.com/automata-network/pico.git", branch = "evm_defer_proof" }
+
 alloy-primitives = { version = "1.2" }
 tokio = { version = "1.35", features = ["full"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -66,3 +72,4 @@ alloy-signer-local = "1.0.17"
 tracing = "0.1.41"
 crossbeam = "0.8.4"
 lazy_static = "1.5.0"
+dotenvy = "0.15"

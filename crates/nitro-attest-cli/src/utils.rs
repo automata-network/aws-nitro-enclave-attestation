@@ -8,11 +8,21 @@ use anyhow::{anyhow, bail};
 use aws_nitro_enclave_attestation_prover::{
     NitroEnclaveProver, NitroEnclaveVerifierContract, ProverConfig,
 };
-use clap::Args;
+use clap::{Args, ValueEnum};
+
+/// Proof type for Boundless proving (CLI enum)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
+pub enum BoundlessProofTypeCli {
+    #[default]
+    #[value(name = "groth16")]
+    Groth16,
+    #[value(name = "merkle")]
+    Merkle,
+}
 
 /// Command-line arguments for configuring zero-knowledge proof system settings.
-/// 
-/// Supports both RISC0 and SP1 proof systems with their respective configuration options.
+///
+/// Supports RISC0, SP1, and Pico proof systems with their respective configuration options.
 /// Only one prover type should be specified at a time.
 #[derive(Args, Clone)]
 pub struct ProverArgs {
@@ -26,40 +36,88 @@ pub struct ProverArgs {
     #[arg(long)]
     pub sp1: bool,
 
+    #[cfg(feature = "pico")]
+    /// Use the Pico zkVM for proof generation
+    #[arg(long)]
+    pub pico: bool,
+
     /// Enable development mode for mock proof generation
     #[arg(long, default_value = "false", env = "DEV_MODE")]
     pub dev: bool,
 
     /// Private key for SP1 network prover
-    #[arg(long, env = "NETWORK_PRIVATE_KEY")]
+    #[arg(long, env = "SP1_PRIVATE_KEY")]
     pub sp1_private_key: Option<String>,
 
     /// RPC URL for SP1 network connection
     #[arg(long)]
     pub sp1_rpc_url: Option<String>,
 
-    /// API URL for RISC0 Bonsai service
-    #[arg(long, env = "BONSAI_API_URL", default_value = "https://api.bonsai.xyz")]
-    pub risc0_api_url: Option<String>,
+    /// Boundless RPC URL for RISC0 proving
+    #[arg(long, env = "BOUNDLESS_RPC_URL")]
+    pub risc0_rpc_url: Option<String>,
 
-    /// API key for RISC0 Bonsai service authentication
-    #[arg(long, env = "BONSAI_API_KEY")]
-    pub risc0_api_key: Option<String>,
+    /// Boundless wallet private key (hex-encoded)
+    #[arg(long, env = "BOUNDLESS_PRIVATE_KEY")]
+    pub risc0_private_key: Option<String>,
+
+    /// Verifier program URL for pre-uploaded ELF (optional, uploads to IPFS if not set)
+    #[arg(long, env = "BOUNDLESS_VERIFIER_PROGRAM_URL")]
+    pub risc0_verifier_program_url: Option<String>,
+
+    /// Aggregator program URL for pre-uploaded ELF (optional, uploads to IPFS if not set)
+    #[arg(long, env = "BOUNDLESS_AGGREGATOR_PROGRAM_URL")]
+    pub risc0_aggregator_program_url: Option<String>,
+
+    /// Proof type for Boundless proving (groth16 or merkle)
+    #[arg(long, value_enum, default_value = "groth16")]
+    pub risc0_proof_type: BoundlessProofTypeCli,
+
+    /// Minimum price in wei per cycle
+    #[arg(long, env = "BOUNDLESS_MIN_PRICE")]
+    pub risc0_min_price: Option<u128>,
+
+    /// Maximum price in wei per cycle
+    #[arg(long, env = "BOUNDLESS_MAX_PRICE")]
+    pub risc0_max_price: Option<u128>,
+
+    /// Timeout in seconds
+    #[arg(long, env = "BOUNDLESS_TIMEOUT")]
+    pub risc0_timeout: Option<u32>,
+
+    /// Ramp-up period in seconds
+    #[arg(long, env = "BOUNDLESS_RAMP_UP_PERIOD")]
+    pub risc0_ramp_up_period: Option<u32>,
 }
 
 impl ProverArgs {
     /// Creates a prover configuration based on the specified arguments.
     pub fn prover_config(&self) -> anyhow::Result<ProverConfig> {
-        #[cfg(all(feature = "sp1", feature = "risc0"))]
-        if self.sp1 && self.risc0 {
+        // Check for mutual exclusion of prover options
+        let prover_count = {
+            let mut count = 0;
+            #[cfg(feature = "risc0")]
+            if self.risc0 { count += 1; }
+            #[cfg(feature = "sp1")]
+            if self.sp1 { count += 1; }
+            #[cfg(feature = "pico")]
+            if self.pico { count += 1; }
+            count
+        };
+
+        if prover_count > 1 {
             return Err(anyhow!(
-                "Cannot use both --sp1 and --risc0 at the same time."
+                "Cannot use multiple provers at the same time. Choose only one: --risc0, --sp1, or --pico"
             ));
         }
 
         #[cfg(feature = "sp1")]
         if self.sp1 {
             use aws_nitro_enclave_attestation_prover::SP1ProverConfig;
+            // Set NETWORK_PRIVATE_KEY from SP1_PRIVATE_KEY before any SP1 SDK code runs
+            if let Some(ref pk) = self.sp1_private_key {
+                std::env::set_var("NETWORK_PRIVATE_KEY", pk);
+            }
             return Ok(ProverConfig::sp1_with(SP1ProverConfig {
                 private_key: self.sp1_private_key.clone(),
                 rpc_url: self.sp1_rpc_url.clone(),
@@ -68,14 +126,35 @@ impl ProverArgs {
 
         #[cfg(feature = "risc0")]
         if self.risc0 {
-            use aws_nitro_enclave_attestation_prover::RiscZeroProverConfig;
+            use aws_nitro_enclave_attestation_prover::{
+                program_risc0::BoundlessProofType, RiscZeroProverConfig,
+            };
+
+            let proof_type = match self.risc0_proof_type {
+                BoundlessProofTypeCli::Merkle => BoundlessProofType::Merkle,
+                BoundlessProofTypeCli::Groth16 => BoundlessProofType::Groth16,
+            };
+
             return Ok(ProverConfig::risc0_with(RiscZeroProverConfig {
-                api_url: self.risc0_api_url.clone(),
-                api_key: self.risc0_api_key.clone(),
+                rpc_url: self.risc0_rpc_url.clone(),
+                private_key: self.risc0_private_key.clone(),
+                verifier_program_url: self.risc0_verifier_program_url.clone(),
+                aggregator_program_url: self.risc0_aggregator_program_url.clone(),
+                proof_type,
+                min_price: self.risc0_min_price,
+                max_price: self.risc0_max_price,
+                timeout: self.risc0_timeout,
+                ramp_up_period: self.risc0_ramp_up_period,
             }));
         }
 
-        bail!("No prover specified. Use --risc0 or --sp1 to select a proof system.");
+        #[cfg(feature = "pico")]
+        if self.pico {
+            use aws_nitro_enclave_attestation_prover::PicoProverConfig;
+            return Ok(ProverConfig::pico_with(PicoProverConfig::default()));
+        }
+
+        bail!("No prover specified. Use --risc0, --sp1, or --pico to select a proof system.");
     }
 
     /// Creates a new `NitroEnclaveProver` instance with the configured settings.
