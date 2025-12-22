@@ -1,0 +1,24 @@
+[package]
+name = "aws-nitro-enclave-attestation-utils"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[features]
+default = []
+wasm = ["wasm-bindgen", "serde-wasm-bindgen", "getrandom"]
+
+[dependencies]
+aws-nitro-enclave-attestation-verifier = { path = "../verifier", default-features = false }
+alloy-primitives = { version = "1.2", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+hex = "0.4"
+anyhow = "1"
+
+wasm-bindgen = { version = "0.2", optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+getrandom = { version = "0.2", features = ["js"], optional = true }

@@ -8,6 +8,7 @@ members = [
     "crates/risc0-methods",
     "crates/sp1-methods",
     "crates/pico-methods",
+    "crates/utils",
 ]
 default-members = [
     "crates/nitro-attest-cli",
@@ -39,6 +40,7 @@ x509-verifier-rust-crypto = { path = "crates/x509-verifier-rust-crypto" }
 risc0-methods = { path = "crates/risc0-methods" }
 sp1-methods = { path = "crates/sp1-methods" }
 pico-methods = { path = "crates/pico-methods" }
+aws-nitro-enclave-attestation-utils = { path = "crates/utils", default-features = false }
 
 clap = { version = "4.0", features = ["derive", "env"] }
 anyhow = { version = "1", features = ["backtrace"] }
