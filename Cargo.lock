@@ -1575,6 +1575,7 @@ name = "aws-nitro-enclave-attestation-utils"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
+ "alloy-sol-types",
  "anyhow",
  "aws-nitro-enclave-attestation-verifier",
  "getrandom 0.2.16",

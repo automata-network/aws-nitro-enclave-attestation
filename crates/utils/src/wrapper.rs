@@ -6,7 +6,7 @@
 use alloy_primitives::{FixedBytes, B128, B256};
 use serde::{Deserialize, Serialize};
 
-use crate::{BatchVerifierJournal, Bytes48, Pcr, VerificationResult, VerifierJournal};
+use crate::{Bytes48, Pcr, VerificationResult, VerifierJournal};
 
 /// Wrapper for PCR (Platform Configuration Register) entry.
 ///
@@ -187,61 +187,6 @@ impl TryFrom<VerifierJournalWrapper> for VerifierJournal {
     }
 }
 
-/// Wrapper for BatchVerifierJournal that can be serialized to/from JSON for WASM.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BatchVerifierJournalWrapper {
-    /// Verification key that was used for batch verification, hex-encoded with "0x" prefix
-    pub verifier_vk: String,
-
-    /// Array of verified attestation results
-    pub outputs: Vec<VerifierJournalWrapper>,
-}
-
-impl From<BatchVerifierJournal> for BatchVerifierJournalWrapper {
-    fn from(batch: BatchVerifierJournal) -> Self {
-        Self {
-            verifier_vk: format!("0x{}", hex::encode(batch.verifierVk)),
-            outputs: batch
-                .outputs
-                .into_iter()
-                .map(VerifierJournalWrapper::from)
-                .collect(),
-        }
-    }
-}
-
-impl TryFrom<BatchVerifierJournalWrapper> for BatchVerifierJournal {
-    type Error = anyhow::Error;
-
-    fn try_from(wrapper: BatchVerifierJournalWrapper) -> Result<Self, Self::Error> {
-        let vk_bytes = hex::decode(wrapper.verifier_vk.trim_start_matches("0x"))
-            .map_err(|e| anyhow::anyhow!("Failed to decode verifierVk: {}", e))?;
-
-        if vk_bytes.len() != 32 {
-            anyhow::bail!(
-                "Invalid verifierVk length: expected 32 bytes, got {}",
-                vk_bytes.len()
-            );
-        }
-
-        let mut vk_arr = [0u8; 32];
-        vk_arr.copy_from_slice(&vk_bytes);
-
-        let outputs: Result<Vec<VerifierJournal>, _> = wrapper
-            .outputs
-            .into_iter()
-            .map(VerifierJournal::try_from)
-            .collect();
-        let outputs = outputs?;
-
-        Ok(Self {
-            verifierVk: FixedBytes(vk_arr),
-            outputs,
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -322,27 +267,4 @@ mod tests {
         assert_eq!(journal.moduleId, roundtrip.moduleId);
     }
 
-    #[test]
-    fn test_batch_verifier_journal_roundtrip() {
-        let batch = BatchVerifierJournal {
-            verifierVk: FixedBytes([0xab; 32]),
-            outputs: vec![VerifierJournal {
-                result: VerificationResult::Success,
-                trustedCertsPrefixLen: 1,
-                timestamp: 1234567890000,
-                certs: vec![FixedBytes([1u8; 32])],
-                userData: vec![].into(),
-                nonce: vec![].into(),
-                publicKey: vec![].into(),
-                pcrs: vec![],
-                moduleId: "test".to_string(),
-            }],
-        };
-
-        let wrapper: BatchVerifierJournalWrapper = batch.clone().into();
-        let roundtrip: BatchVerifierJournal = wrapper.try_into().expect("roundtrip failed");
-
-        assert_eq!(batch.verifierVk, roundtrip.verifierVk);
-        assert_eq!(batch.outputs.len(), roundtrip.outputs.len());
-    }
 }

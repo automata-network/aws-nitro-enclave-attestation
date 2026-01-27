@@ -1,13 +1,12 @@
 //! WASM bindings for AWS Nitro Enclave attestation utilities.
 //!
 //! Provides functions for parsing and encoding VerifierJournal and
-//! BatchVerifierJournal data structures for frontend integration.
+//! VerifierJournal[] data structures for frontend integration.
 
+use alloy_sol_types::SolValue;
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    BatchVerifierJournal, BatchVerifierJournalWrapper, VerifierJournal, VerifierJournalWrapper,
-};
+use crate::{VerifierJournal, VerifierJournalWrapper};
 
 /// Parse ABI-encoded VerifierJournal bytes into a JSON-serializable object.
 ///
@@ -49,36 +48,36 @@ pub fn encode_verified_journal(journal: JsValue) -> Vec<u8> {
     journal.encode()
 }
 
-/// Parse ABI-encoded BatchVerifierJournal bytes into a JSON-serializable object.
+/// Parse ABI-encoded VerifierJournal[] bytes into a JSON-serializable array.
 ///
 /// # Arguments
-/// * `bytes` - ABI-encoded BatchVerifierJournal bytes
+/// * `bytes` - ABI-encoded VerifierJournal[] bytes (from BatchAttestationSubmitted event)
 ///
 /// # Returns
-/// A JavaScript object representing the parsed BatchVerifierJournal with fields:
-/// - `verifierVk`: String (hex-encoded bytes32 with "0x" prefix)
-/// - `outputs`: Array of VerifierJournal objects (see parse_verified_journal for format)
+/// A JavaScript array of VerifierJournal objects (see parse_verified_journal for format)
 #[wasm_bindgen]
 pub fn parse_batch_verified_journal(bytes: &[u8]) -> JsValue {
-    let batch_journal =
-        BatchVerifierJournal::decode(bytes).expect("Failed to decode BatchVerifierJournal");
-    let wrapper: BatchVerifierJournalWrapper = batch_journal.into();
-    serde_wasm_bindgen::to_value(&wrapper).expect("Failed to serialize to JsValue")
+    let journals = <Vec<VerifierJournal>>::abi_decode(bytes)
+        .expect("Failed to decode VerifierJournal[]");
+    let wrappers: Vec<VerifierJournalWrapper> =
+        journals.into_iter().map(VerifierJournalWrapper::from).collect();
+    serde_wasm_bindgen::to_value(&wrappers).expect("Failed to serialize to JsValue")
 }
 
-/// Encode a BatchVerifierJournal object to ABI-encoded bytes.
+/// Encode a VerifierJournal[] array to ABI-encoded bytes.
 ///
 /// # Arguments
-/// * `journal` - A JavaScript object with the BatchVerifierJournal structure (see parse_batch_verified_journal for format)
+/// * `journals` - A JavaScript array of VerifierJournal objects (see parse_verified_journal for format)
 ///
 /// # Returns
 /// ABI-encoded bytes as a Uint8Array
 #[wasm_bindgen]
-pub fn encode_batch_verified_journal(journal: JsValue) -> Vec<u8> {
-    let wrapper: BatchVerifierJournalWrapper =
-        serde_wasm_bindgen::from_value(journal).expect("Failed to deserialize from JsValue");
-    let batch_journal: BatchVerifierJournal = wrapper
-        .try_into()
-        .expect("Failed to convert to BatchVerifierJournal");
-    batch_journal.encode()
+pub fn encode_batch_verified_journal(journals: JsValue) -> Vec<u8> {
+    let wrappers: Vec<VerifierJournalWrapper> =
+        serde_wasm_bindgen::from_value(journals).expect("Failed to deserialize from JsValue");
+    let journals: Vec<VerifierJournal> = wrappers
+        .into_iter()
+        .map(|w| w.try_into().expect("Failed to convert to VerifierJournal"))
+        .collect();
+    journals.abi_encode()
 }

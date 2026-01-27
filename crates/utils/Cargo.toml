@@ -15,6 +15,7 @@ wasm = ["wasm-bindgen", "serde-wasm-bindgen", "getrandom"]
 [dependencies]
 aws-nitro-enclave-attestation-verifier = { path = "../verifier", default-features = false }
 alloy-primitives = { version = "1.2", default-features = false }
+alloy-sol-types = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 hex = "0.4"
 anyhow = "1"
