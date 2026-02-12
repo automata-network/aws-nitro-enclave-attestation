@@ -27,8 +27,8 @@ use risc0_methods::{
     RISC0_AGGREGATOR_ELF, RISC0_AGGREGATOR_ID, RISC0_VERIFIER_ELF, RISC0_VERIFIER_ID,
 };
 use risc0_zkvm::{
-    default_executor, Digest, ExecutorEnv, InnerReceipt, Receipt, ReceiptClaim, VERSION,
-    compute_image_id,
+    default_executor, default_prover, Digest, ExecutorEnv, InnerReceipt, ProverOpts, Receipt,
+    ReceiptClaim, VERSION, compute_image_id,
 };
 use serde::Serialize;
 
@@ -311,6 +311,22 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
         })
     }
 
+    /// Direct proving via risc0-zkvm's default_prover() (Bonsai, local, or IPC).
+    /// Generates a real Groth16 proof without going through the Boundless network.
+    fn gen_proof_direct(&self, input_bytes: &[u8]) -> anyhow::Result<RawProof> {
+        let env = ExecutorEnv::builder()
+            .write_slice(input_bytes)
+            .build()?;
+
+        let prover = default_prover();
+        let opts = ProverOpts::groth16();
+        let prove_info = prover.prove_with_opts(env, self.elf, &opts)?;
+        let receipt = prove_info.receipt;
+
+        let journal: Bytes = receipt.journal.bytes.clone().into();
+        Ok(RawProof::from_proof(&receipt, journal)?)
+    }
+
     /// Dev mode: execute aggregator zkVM without proof generation.
     /// Deserializes full Receipts from bincode-encoded data.
     fn gen_dev_aggregated_proof(
@@ -564,16 +580,24 @@ where
             }
         } else {
             let cfg = RiscZeroProverConfig::default();
+            let use_boundless = cfg.rpc_url.is_some() && cfg.private_key.is_some();
+
             if is_aggregation {
+                if !use_boundless {
+                    return Err(anyhow!("Aggregation requires Boundless (set BOUNDLESS_RPC_URL and BOUNDLESS_PRIVATE_KEY)"));
+                }
                 // Boundless aggregation: deserialize receipts and submit to aggregator
                 Self::gen_proof_boundless_aggregated(
                     &input_bytes,
                     encoded_composite_proofs.unwrap(),
                     &cfg,
                 )
-            } else {
+            } else if use_boundless {
                 // Boundless single proof
                 self.gen_proof_boundless(&input_bytes, raw_proof_type, &cfg)
+            } else {
+                // Direct proving via risc0 default_prover() (Bonsai, local, or IPC)
+                self.gen_proof_direct(&input_bytes)
             }
         }
     }
