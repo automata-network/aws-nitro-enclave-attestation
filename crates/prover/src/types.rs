@@ -74,7 +74,11 @@ pub struct ProgramId {
 }
 
 impl ProgramId {
-    pub fn verify(&self, zk_config: &ZkCoProcessorConfig, verifier_proof_id: B256) -> anyhow::Result<()> {
+    pub fn verify(
+        &self,
+        zk_config: &ZkCoProcessorConfig,
+        verifier_proof_id: B256,
+    ) -> anyhow::Result<()> {
         if zk_config.aggregatorId != self.aggregator_id
             || zk_config.verifierId != self.verifier_id
             || verifier_proof_id != self.verifier_proof_id

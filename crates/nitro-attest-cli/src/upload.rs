@@ -11,7 +11,7 @@ use clap::Args;
 use crate::utils::ProverArgs;
 
 /// Command-line arguments for uploading ZK programs to remote proving services.
-/// 
+///
 /// This enables distributed proof generation by uploading the necessary program
 /// images to SP1 or RISC0 remote proving infrastructure.
 #[derive(Args)]
@@ -20,7 +20,7 @@ pub struct UploadCli {
     prover: ProverArgs,
 
     /// Output file path for storing the program identifier
-    /// 
+    ///
     /// The program ID is needed for setup the NitroEnclaveVerifierContract.
     /// If not specified, the program ID will only be displayed to stdout.
     #[clap(long)]
@@ -29,7 +29,7 @@ pub struct UploadCli {
 
 impl UploadCli {
     /// Executes the program upload command.
-    /// 
+    ///
     /// This method:
     /// 1. Disables development mode (uploads require production builds)
     /// 2. Creates a prover instance without contract binding
@@ -38,7 +38,7 @@ impl UploadCli {
     pub fn run(&self) -> anyhow::Result<()> {
         // Force network prover for uploads (dev mode programs cannot be uploaded)
         set_prover_dev_mode(false);
-        
+
         // Create prover without contract binding (uploads don't need contracts)
         let prover = self.prover.new_prover(None)?;
         let result = prover.upload_program_images()?;

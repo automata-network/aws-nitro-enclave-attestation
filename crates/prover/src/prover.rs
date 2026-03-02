@@ -9,9 +9,7 @@ use crate::{
 use alloy_primitives::Bytes;
 use anyhow::{anyhow, bail, Context};
 use aws_nitro_enclave_attestation_verifier::{
-    stub::{
-        BatchVerifierJournal, VerifierInput, VerifierJournal, ZkCoProcessorType,
-    },
+    stub::{BatchVerifierJournal, VerifierInput, VerifierJournal, ZkCoProcessorType},
     AttestationReport,
 };
 
@@ -666,16 +664,18 @@ impl NitroEnclaveProver {
             Some(verifier_contract) => {
                 // make sure the zk config aligned
                 let zk_config = block_on(verifier_contract.zk_config(self.verifier.zktype()))?;
-                let verifier_proof_id = block_on(verifier_contract.get_verifier_proof_id(
-                    self.verifier.zktype(),
-                    zk_config.verifierId,
-                ))?;
+                let verifier_proof_id = block_on(
+                    verifier_contract
+                        .get_verifier_proof_id(self.verifier.zktype(), zk_config.verifierId),
+                )?;
                 max_time_diff = block_on(verifier_contract.max_time_diff())?;
 
                 let program_id = self.get_program_id();
-                let verify_result = program_id.verify(&zk_config, verifier_proof_id).with_context(|| {
-                    format!("Failed to verify zkconfig for {:?}", self.verifier.zktype())
-                });
+                let verify_result = program_id
+                    .verify(&zk_config, verifier_proof_id)
+                    .with_context(|| {
+                        format!("Failed to verify zkconfig for {:?}", self.verifier.zktype())
+                    });
                 if let Err(verify_err) = verify_result {
                     if !self.cfg.skip_contract_program_id_check {
                         bail!(

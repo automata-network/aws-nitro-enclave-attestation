@@ -18,10 +18,10 @@ use crate::utils::{ContractArgs, ProverArgs};
 pub enum ProofCli {
     /// Verify a proof on-chain using smart contract
     VerifyOnChain(ProofVerifyOnChainCli),
-    
+
     /// Generate composite proofs for single attestation reports  
     GenComposite(ProofGenCompositeCli),
-    
+
     /// Aggregate multiple proofs into a single proof
     Aggregate(ProofAggregateCli),
 }
@@ -51,7 +51,7 @@ pub struct ProofVerifyOnChainCli {
 
 impl ProofVerifyOnChainCli {
     /// Executes on-chain proof verification.
-    /// 
+    ///
     /// This method submits a proof to the smart contract for verification,
     /// ensuring the proof was generated correctly and corresponds to valid
     /// Nitro Enclave attestation data.
@@ -63,7 +63,7 @@ impl ProofVerifyOnChainCli {
 
         // Load and parse the proof file
         let result = OnchainProof::decode_json(&std::fs::read(&self.proof)?)?;
-        
+
         // Validate that the proof contains on-chain verification data
         if result.onchain_proof.len() == 0 {
             return Err(anyhow::anyhow!(
@@ -101,12 +101,12 @@ pub struct ProofAggregateCli {
 
 impl ProofAggregateCli {
     /// Executes proof aggregation.
-    /// 
+    ///
     /// Combines multiple individual proofs into a single aggregated proof,
     /// enabling efficient batch verification of multiple attestation reports.
     pub fn run(&self) -> anyhow::Result<()> {
         set_prover_dev_mode(self.prover.dev);
-        
+
         // Validate that proof files are provided
         if self.proof.is_empty() {
             return Err(anyhow!(
@@ -124,7 +124,7 @@ impl ProofAggregateCli {
         // Initialize prover and contract interface
         let contract = self.contract.stub()?;
         let prover = self.prover.new_prover(contract)?;
-        
+
         // Aggregate the proofs into a single proof
         let aggregated_proof = prover.aggregate_proofs(proofs)?;
         let aggregated_proof =
@@ -162,19 +162,19 @@ pub struct ProofGenCompositeCli {
 
 impl ProofGenCompositeCli {
     /// Executes composite proof generation.
-    /// 
+    ///
     /// Creates a composite proof structure that can be used for more
     /// complex verification scenarios or as input to aggregation.
     pub fn run(&self) -> anyhow::Result<()> {
         set_prover_dev_mode(self.prover.dev);
-        
+
         // Read the attestation report file
         let raw_report = std::fs::read(&self.report)?;
 
         // Initialize prover and contract interface
         let contract = self.contract.stub()?;
         let prover = self.prover.new_prover(contract)?;
-        
+
         // Prepare inputs and generate composite proof
         let inputs = prover.prepare_verifier_inputs(vec![raw_report])?;
         let composite_proof = prover.gen_multi_composite_proofs(&inputs)?.remove(0);
