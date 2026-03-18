@@ -57,10 +57,12 @@ pub fn encode_verified_journal(journal: JsValue) -> Vec<u8> {
 /// A JavaScript array of VerifierJournal objects (see parse_verified_journal for format)
 #[wasm_bindgen]
 pub fn parse_batch_verified_journal(bytes: &[u8]) -> JsValue {
-    let journals = <Vec<VerifierJournal>>::abi_decode(bytes)
-        .expect("Failed to decode VerifierJournal[]");
-    let wrappers: Vec<VerifierJournalWrapper> =
-        journals.into_iter().map(VerifierJournalWrapper::from).collect();
+    let journals =
+        <Vec<VerifierJournal>>::abi_decode(bytes).expect("Failed to decode VerifierJournal[]");
+    let wrappers: Vec<VerifierJournalWrapper> = journals
+        .into_iter()
+        .map(VerifierJournalWrapper::from)
+        .collect();
     serde_wasm_bindgen::to_value(&wrappers).expect("Failed to serialize to JsValue")
 }
 

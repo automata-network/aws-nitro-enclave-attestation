@@ -18,8 +18,7 @@ use boundless_market::{
     contracts::FulfillmentData,
     request_builder::OfferParams,
     storage::storage_provider_from_env,
-    Deployment,
-    StorageProvider,
+    Deployment, StorageProvider,
 };
 use lazy_static::lazy_static;
 use risc0_ethereum_contracts::{groth16, receipt::decode_seal_with_claim};
@@ -27,8 +26,8 @@ use risc0_methods::{
     RISC0_AGGREGATOR_ELF, RISC0_AGGREGATOR_ID, RISC0_VERIFIER_ELF, RISC0_VERIFIER_ID,
 };
 use risc0_zkvm::{
-    default_executor, Digest, ExecutorEnv, InnerReceipt, Receipt, ReceiptClaim, VERSION,
-    compute_image_id,
+    compute_image_id, default_executor, default_prover, Digest, ExecutorEnv, InnerReceipt,
+    ProverOpts, Receipt, ReceiptClaim, VERSION,
 };
 use serde::Serialize;
 
@@ -111,21 +110,27 @@ impl RiscZeroProverConfig {
 
     /// Get effective min price (config or default: 0.0001 gwei)
     pub fn effective_min_price(&self) -> U256 {
-        self.min_price
-            .map(U256::from)
-            .unwrap_or_else(|| parse_units(Self::DEFAULT_MIN_PRICE_GWEI, "gwei").unwrap().into())
+        self.min_price.map(U256::from).unwrap_or_else(|| {
+            parse_units(Self::DEFAULT_MIN_PRICE_GWEI, "gwei")
+                .unwrap()
+                .into()
+        })
     }
 
     /// Get effective max price (config or default: 0.001 gwei)
     pub fn effective_max_price(&self) -> U256 {
-        self.max_price
-            .map(U256::from)
-            .unwrap_or_else(|| parse_units(Self::DEFAULT_MAX_PRICE_GWEI, "gwei").unwrap().into())
+        self.max_price.map(U256::from).unwrap_or_else(|| {
+            parse_units(Self::DEFAULT_MAX_PRICE_GWEI, "gwei")
+                .unwrap()
+                .into()
+        })
     }
 
     /// Get effective collateral (default: 10 ETH)
     pub fn effective_collateral(&self) -> U256 {
-        parse_units(Self::DEFAULT_COLLATERAL_ETH, "ether").unwrap().into()
+        parse_units(Self::DEFAULT_COLLATERAL_ETH, "ether")
+            .unwrap()
+            .into()
     }
 
     /// Get effective timeout with buffer
@@ -296,9 +301,7 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
 
     /// Dev mode: execute zkVM without proof generation
     fn gen_dev_proof(&self, input_bytes: &[u8]) -> anyhow::Result<RawProof> {
-        let env = ExecutorEnv::builder()
-            .write_slice(input_bytes)
-            .build()?;
+        let env = ExecutorEnv::builder().write_slice(input_bytes).build()?;
 
         let executor = default_executor();
         let session = executor.execute(env, self.elf)?;
@@ -309,6 +312,20 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
             encoded_proof: Bytes::new(), // Empty proof in dev mode
             journal,
         })
+    }
+
+    /// Direct proving via risc0-zkvm's default_prover() (Bonsai, local, or IPC).
+    /// Generates a real Groth16 proof without going through the Boundless network.
+    fn gen_proof_direct(&self, input_bytes: &[u8]) -> anyhow::Result<RawProof> {
+        let env = ExecutorEnv::builder().write_slice(input_bytes).build()?;
+
+        let prover = default_prover();
+        let opts = ProverOpts::groth16();
+        let prove_info = prover.prove_with_opts(env, self.elf, &opts)?;
+        let receipt = prove_info.receipt;
+
+        let journal: Bytes = receipt.journal.bytes.clone().into();
+        Ok(RawProof::from_proof(&receipt, journal)?)
     }
 
     /// Dev mode: execute aggregator zkVM without proof generation.
@@ -334,8 +351,7 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
         let receipts: Vec<Receipt> = encoded_proofs
             .iter()
             .map(|encoded_receipt| {
-                bincode::deserialize(encoded_receipt)
-                    .context("Failed to deserialize Receipt")
+                bincode::deserialize(encoded_receipt).context("Failed to deserialize Receipt")
             })
             .collect::<anyhow::Result<_>>()?;
 
@@ -352,9 +368,7 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
         framed_input.extend_from_slice(&input_frame);
 
         // Execute aggregator in dev mode
-        let env = ExecutorEnv::builder()
-            .write_slice(&framed_input)
-            .build()?;
+        let env = ExecutorEnv::builder().write_slice(&framed_input).build()?;
 
         let executor = default_executor();
         let session = executor.execute(env, RISC0_AGGREGATOR_ELF)?;
@@ -363,6 +377,57 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
             encoded_proof: Bytes::new(), // Empty proof in dev mode
             journal: session.journal.bytes.clone().into(),
         })
+    }
+
+    /// Direct aggregation via risc0-zkvm's default_prover() (Bonsai, local, or IPC).
+    /// Registers inner receipts as assumptions so the aggregator guest can verify them.
+    fn gen_proof_direct_aggregated(
+        input_bytes: &[u8],
+        encoded_proofs: &[&Bytes],
+    ) -> anyhow::Result<RawProof> {
+        let batch_input = BatchVerifierJournal::decode(input_bytes)
+            .context("Failed to decode BatchVerifierJournal")?;
+
+        if encoded_proofs.len() != batch_input.outputs.len() {
+            return Err(anyhow!(
+                "Number of proofs ({}) must match number of outputs ({})",
+                encoded_proofs.len(),
+                batch_input.outputs.len()
+            ));
+        }
+
+        let receipts: Vec<Receipt> = encoded_proofs
+            .iter()
+            .map(|encoded_receipt| {
+                bincode::deserialize(encoded_receipt).context("Failed to deserialize Receipt")
+            })
+            .collect::<anyhow::Result<_>>()?;
+
+        let aggregator_input = AggregatorInput {
+            input_bytes: input_bytes.to_vec(),
+            receipts: receipts.clone(),
+        };
+
+        let input_frame = postcard::to_allocvec(&aggregator_input)
+            .context("Failed to serialize aggregator input with postcard")?;
+        let mut framed_input = Vec::with_capacity(4 + input_frame.len());
+        framed_input.extend_from_slice(&(input_frame.len() as u32).to_le_bytes());
+        framed_input.extend_from_slice(&input_frame);
+
+        let mut env_builder = ExecutorEnv::builder();
+        env_builder.write_slice(&framed_input);
+        for receipt in &receipts {
+            env_builder.add_assumption(receipt.clone());
+        }
+        let env = env_builder.build()?;
+
+        let prover = default_prover();
+        let opts = ProverOpts::groth16();
+        let prove_info = prover.prove_with_opts(env, RISC0_AGGREGATOR_ELF, &opts)?;
+        let receipt = prove_info.receipt;
+
+        let journal: Bytes = receipt.journal.bytes.clone().into();
+        RawProof::from_proof(&receipt, journal)
     }
 
     /// Production: generate proof via Boundless network.
@@ -379,7 +444,8 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
 
         block_on(async {
             let (seal_bytes, journal_bytes) =
-                Self::submit_boundless_request(input_bytes, self.elf, cfg, program_url, true).await?;
+                Self::submit_boundless_request(input_bytes, self.elf, cfg, program_url, true)
+                    .await?;
 
             // Construct Receipt from fulfillment - stores full Receipt for aggregation
             let receipt = Self::construct_receipt(seal_bytes, journal_bytes.clone(), image_id)?;
@@ -413,8 +479,7 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
         let receipts: Vec<Receipt> = encoded_proofs
             .iter()
             .map(|encoded_receipt| {
-                bincode::deserialize(encoded_receipt)
-                    .context("Failed to deserialize Receipt")
+                bincode::deserialize(encoded_receipt).context("Failed to deserialize Receipt")
             })
             .collect::<anyhow::Result<_>>()?;
 
@@ -433,12 +498,19 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
         let program_url = cfg.aggregator_program_url.as_deref();
 
         block_on(async {
-            let (seal_bytes, journal_bytes) =
-                Self::submit_boundless_request(&framed_input, RISC0_AGGREGATOR_ELF, cfg, program_url, true).await?;
+            let (seal_bytes, journal_bytes) = Self::submit_boundless_request(
+                &framed_input,
+                RISC0_AGGREGATOR_ELF,
+                cfg,
+                program_url,
+                true,
+            )
+            .await?;
 
             // Construct Receipt from fulfillment (seal has selector prefix)
             let aggregator_image_id = compute_image_id(RISC0_AGGREGATOR_ELF)?;
-            let receipt = Self::construct_receipt(seal_bytes, journal_bytes.clone(), aggregator_image_id)?;
+            let receipt =
+                Self::construct_receipt(seal_bytes, journal_bytes.clone(), aggregator_image_id)?;
 
             Ok(RawProof::from_proof(&receipt, journal_bytes.into())?)
         })
@@ -465,12 +537,8 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
         // - Extracts correct verifier parameters from the selector
         // - Handles Groth16, FakeReceipt, and SetVerifier seal types
         let claim = ReceiptClaim::ok(image_id, journal.clone());
-        let receipt = decode_seal_with_claim(
-            alloy_primitives::Bytes::from(seal),
-            claim,
-            journal,
-        )
-        .context("Failed to decode seal")?;
+        let receipt = decode_seal_with_claim(alloy_primitives::Bytes::from(seal), claim, journal)
+            .context("Failed to decode seal")?;
 
         receipt
             .receipt()
@@ -564,16 +632,27 @@ where
             }
         } else {
             let cfg = RiscZeroProverConfig::default();
+            let use_boundless = cfg.rpc_url.is_some() && cfg.private_key.is_some();
+
             if is_aggregation {
-                // Boundless aggregation: deserialize receipts and submit to aggregator
-                Self::gen_proof_boundless_aggregated(
-                    &input_bytes,
-                    encoded_composite_proofs.unwrap(),
-                    &cfg,
-                )
-            } else {
+                if use_boundless {
+                    Self::gen_proof_boundless_aggregated(
+                        &input_bytes,
+                        encoded_composite_proofs.unwrap(),
+                        &cfg,
+                    )
+                } else {
+                    Self::gen_proof_direct_aggregated(
+                        &input_bytes,
+                        encoded_composite_proofs.unwrap(),
+                    )
+                }
+            } else if use_boundless {
                 // Boundless single proof
                 self.gen_proof_boundless(&input_bytes, raw_proof_type, &cfg)
+            } else {
+                // Direct proving via risc0 default_prover() (Bonsai, local, or IPC)
+                self.gen_proof_direct(&input_bytes)
             }
         }
     }

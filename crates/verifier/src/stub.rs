@@ -32,7 +32,9 @@ impl Bytes48 {
         self.first.is_zero() && self.second.is_zero()
     }
     pub fn to_bytes(&self) -> Bytes {
-        [self.first.as_slice(), self.second.as_slice()].concat().into()
+        [self.first.as_slice(), self.second.as_slice()]
+            .concat()
+            .into()
     }
 }
 

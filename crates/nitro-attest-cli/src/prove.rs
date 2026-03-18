@@ -12,20 +12,20 @@ use clap::Args;
 use crate::utils::{ContractArgs, ProverArgs};
 
 /// Command-line arguments for the prove subcommand.
-/// 
+///
 /// Generates zero-knowledge proofs from one or more Nitro Enclave attestation reports.
 /// Supports both single report verification and multi-report aggregation.
 #[derive(Args)]
 pub struct ProveCli {
     /// Path(s) to Nitro Enclave attestation report files
-    /// 
+    ///
     /// Can specify multiple report files to generate an aggregated proof.
     /// Each file should contain a binary attestation report from AWS Nitro Enclaves.
     #[arg(long)]
     report: Vec<PathBuf>,
 
     /// Output file path for the generated proof
-    /// 
+    ///
     /// If not specified, the proof will only be printed to stdout.
     /// The output format is JSON containing the proof data and metadata.
     #[arg(long)]
@@ -42,7 +42,7 @@ pub struct ProveCli {
 
 impl ProveCli {
     /// Executes the proof generation command.
-    /// 
+    ///
     /// This method orchestrates the entire proof generation process:
     /// 1. Configures the prover with development mode settings
     /// 2. Validates input parameters
@@ -65,10 +65,10 @@ impl ProveCli {
 
         // Initialize smart contract interface (if configured)
         let contract = self.contract.stub()?;
-        
+
         // Create the prover instance with the specified configuration
         let prover = self.prover.new_prover(contract)?;
-        
+
         // Generate proof based on the number of input reports
         let result = if raw_reports.len() == 1 {
             prover.prove_attestation_report(raw_reports.remove(0))?
@@ -80,7 +80,7 @@ impl ProveCli {
         if let Some(out) = &self.out {
             std::fs::write(out, result.encode_json()?)?;
         }
-        
+
         // Display proof information to stdout
         println!("proof: {:?}", result);
 

@@ -266,5 +266,4 @@ mod tests {
         assert_eq!(journal.pcrs.len(), roundtrip.pcrs.len());
         assert_eq!(journal.moduleId, roundtrip.moduleId);
     }
-
 }

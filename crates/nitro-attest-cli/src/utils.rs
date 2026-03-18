@@ -97,11 +97,17 @@ impl ProverArgs {
         let prover_count = {
             let mut count = 0;
             #[cfg(feature = "risc0")]
-            if self.risc0 { count += 1; }
+            if self.risc0 {
+                count += 1;
+            }
             #[cfg(feature = "sp1")]
-            if self.sp1 { count += 1; }
+            if self.sp1 {
+                count += 1;
+            }
             #[cfg(feature = "pico")]
-            if self.pico { count += 1; }
+            if self.pico {
+                count += 1;
+            }
             count
         };
 
@@ -167,7 +173,7 @@ impl ProverArgs {
 }
 
 /// Command-line arguments for configuring smart contract interaction.
-/// 
+///
 /// Used for on-chain proof verification and other blockchain operations.
 #[derive(Args, Clone)]
 pub struct ContractArgs {

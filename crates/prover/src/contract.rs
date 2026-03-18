@@ -89,7 +89,9 @@ impl NitroEnclaveVerifierContract {
         let proof_bytes = proof.onchain_proof.clone();
         let zk = proof.zktype;
         let zk_config = self.zk_config(proof.zktype).await?;
-        let verifier_proof_id = self.get_verifier_proof_id(proof.zktype, zk_config.verifierId).await?;
+        let verifier_proof_id = self
+            .get_verifier_proof_id(proof.zktype, zk_config.verifierId)
+            .await?;
         proof.program_id.verify(&zk_config, verifier_proof_id)?;
 
         Ok(match proof.proof_type {

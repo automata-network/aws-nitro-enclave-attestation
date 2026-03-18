@@ -69,8 +69,7 @@ fn main() {
         file,
         r#"pub const RISC0_VERIFIER_ELF: &[u8] = include_bytes!({:?});
 pub const RISC0_AGGREGATOR_ELF: &[u8] = include_bytes!({:?});"#,
-        elf_paths.0,
-        elf_paths.1
+        elf_paths.0, elf_paths.1
     )
     .unwrap();
 
