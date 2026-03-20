@@ -26,8 +26,8 @@ use risc0_methods::{
     RISC0_AGGREGATOR_ELF, RISC0_AGGREGATOR_ID, RISC0_VERIFIER_ELF, RISC0_VERIFIER_ID,
 };
 use risc0_zkvm::{
-    compute_image_id, default_executor, default_prover, Digest, ExecutorEnv, InnerReceipt,
-    ProverOpts, Receipt, ReceiptClaim, VERSION,
+    default_prover, Digest, ExecutorEnv, InnerReceipt, Receipt, ReceiptClaim, VERSION,
+    compute_image_id,
 };
 use serde::Serialize;
 
@@ -299,38 +299,23 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
         Ok((fulfillment.seal.to_vec(), journal))
     }
 
-    /// Dev mode: execute zkVM without proof generation
-    fn gen_dev_proof(&self, input_bytes: &[u8]) -> anyhow::Result<RawProof> {
-        let env = ExecutorEnv::builder().write_slice(input_bytes).build()?;
+    /// Generate proof using the local prover (default_prover).
+    /// In dev mode (RISC0_DEV_MODE=1), this produces mock proofs.
+    /// In production without Boundless, this produces real proofs locally.
+    fn gen_direct_proof(&self, input_bytes: &[u8]) -> anyhow::Result<RawProof> {
+        let env = ExecutorEnv::builder()
+            .write_slice(input_bytes)
+            .build()?;
 
-        let executor = default_executor();
-        let session = executor.execute(env, self.elf)?;
-
-        // Return mock proof with real journal from execution
-        let journal: Bytes = session.journal.bytes.clone().into();
-        Ok(RawProof {
-            encoded_proof: Bytes::new(), // Empty proof in dev mode
-            journal,
-        })
-    }
-
-    /// Direct proving via risc0-zkvm's default_prover() (Bonsai, local, or IPC).
-    /// Generates a real Groth16 proof without going through the Boundless network.
-    fn gen_proof_direct(&self, input_bytes: &[u8]) -> anyhow::Result<RawProof> {
-        let env = ExecutorEnv::builder().write_slice(input_bytes).build()?;
-
-        let prover = default_prover();
-        let opts = ProverOpts::groth16();
-        let prove_info = prover.prove_with_opts(env, self.elf, &opts)?;
+        let prove_info = default_prover().prove(env, self.elf)?;
         let receipt = prove_info.receipt;
-
         let journal: Bytes = receipt.journal.bytes.clone().into();
         Ok(RawProof::from_proof(&receipt, journal)?)
     }
 
-    /// Dev mode: execute aggregator zkVM without proof generation.
+    /// Generate aggregated proof using the local prover (default_prover).
     /// Deserializes full Receipts from bincode-encoded data.
-    fn gen_dev_aggregated_proof(
+    fn gen_direct_aggregated_proof(
         input_bytes: &[u8],
         encoded_proofs: &[&Bytes],
     ) -> anyhow::Result<RawProof> {
@@ -367,16 +352,14 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
         framed_input.extend_from_slice(&(input_frame.len() as u32).to_le_bytes());
         framed_input.extend_from_slice(&input_frame);
 
-        // Execute aggregator in dev mode
-        let env = ExecutorEnv::builder().write_slice(&framed_input).build()?;
+        let env = ExecutorEnv::builder()
+            .write_slice(&framed_input)
+            .build()?;
 
-        let executor = default_executor();
-        let session = executor.execute(env, RISC0_AGGREGATOR_ELF)?;
-
-        Ok(RawProof {
-            encoded_proof: Bytes::new(), // Empty proof in dev mode
-            journal: session.journal.bytes.clone().into(),
-        })
+        let prove_info = default_prover().prove(env, RISC0_AGGREGATOR_ELF)?;
+        let receipt = prove_info.receipt;
+        let journal: Bytes = receipt.journal.bytes.clone().into();
+        Ok(RawProof::from_proof(&receipt, journal)?)
     }
 
     /// Direct aggregation via risc0-zkvm's default_prover() (Bonsai, local, or IPC).
@@ -622,37 +605,32 @@ where
         let input_bytes = input.abi_encode();
         let is_aggregation = encoded_composite_proofs.is_some();
 
-        if dev_mode {
-            if is_aggregation {
-                // Dev mode aggregation: execute aggregator with receipts
-                Self::gen_dev_aggregated_proof(&input_bytes, encoded_composite_proofs.unwrap())
-            } else {
-                // Dev mode single proof
-                self.gen_dev_proof(&input_bytes)
-            }
-        } else {
-            let cfg = RiscZeroProverConfig::default();
-            let use_boundless = cfg.rpc_url.is_some() && cfg.private_key.is_some();
+        let cfg = RiscZeroProverConfig::default();
+        let use_boundless = !dev_mode
+            && cfg.rpc_url.is_some()
+            && cfg.private_key.is_some();
 
+        if use_boundless {
             if is_aggregation {
-                if use_boundless {
-                    Self::gen_proof_boundless_aggregated(
-                        &input_bytes,
-                        encoded_composite_proofs.unwrap(),
-                        &cfg,
-                    )
-                } else {
-                    Self::gen_proof_direct_aggregated(
-                        &input_bytes,
-                        encoded_composite_proofs.unwrap(),
-                    )
-                }
-            } else if use_boundless {
-                // Boundless single proof
+                Self::gen_proof_boundless_aggregated(
+                    &input_bytes,
+                    encoded_composite_proofs.unwrap(),
+                    &cfg,
+                )
+            } else {
                 self.gen_proof_boundless(&input_bytes, raw_proof_type, &cfg)
             } else {
                 // Direct proving via risc0 default_prover() (Bonsai, local, or IPC)
                 self.gen_proof_direct(&input_bytes)
+            }
+        } else {
+            if is_aggregation {
+                Self::gen_direct_aggregated_proof(
+                    &input_bytes,
+                    encoded_composite_proofs.unwrap(),
+                )
+            } else {
+                self.gen_direct_proof(&input_bytes)
             }
         }
     }
