@@ -619,9 +619,6 @@ where
                 )
             } else {
                 self.gen_proof_boundless(&input_bytes, raw_proof_type, &cfg)
-            } else {
-                // Direct proving via risc0 default_prover() (Bonsai, local, or IPC)
-                self.gen_proof_direct(&input_bytes)
             }
         } else {
             if is_aggregation {
