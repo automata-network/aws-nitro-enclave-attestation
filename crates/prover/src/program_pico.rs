@@ -9,7 +9,7 @@ use aws_nitro_enclave_attestation_verifier::stub::{
     BatchVerifierJournal, VerifierInput, VerifierJournal, ZkCoProcessorType,
 };
 use lazy_static::lazy_static;
-use p3_field::PrimeField;
+use pico_p3_field::PrimeField;
 use pico_methods::{PICO_AGGREGATOR_ELF, PICO_VERIFIER_ELF};
 use pico_sdk::{client::KoalaBearProverClient, HashableKey};
 use pico_vm::{
