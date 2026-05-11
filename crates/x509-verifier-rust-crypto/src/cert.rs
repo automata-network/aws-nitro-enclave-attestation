@@ -72,7 +72,7 @@ impl<'a> Cert<'a> {
         SigAlgo::from_oid(self.raw.signature_algorithm.oid())
     }
 
-    pub fn pubkey(&self) -> PubKey {
+    pub fn pubkey(&self) -> PubKey<'_> {
         PubKey {
             algo: self.pubkey_algo.clone(),
             val: self.raw.public_key().subject_public_key.as_ref(),
@@ -162,7 +162,7 @@ impl<'a> CertChain<'a> {
         Ok(())
     }
 
-    pub fn leaf_pubkey(&self) -> PubKey {
+    pub fn leaf_pubkey(&self) -> PubKey<'_> {
         self.leaf().pubkey()
     }
 

@@ -61,9 +61,19 @@ A comprehensive SDK for AWS Nitro Enclave attestation verification that generate
 
 | ZkType | Verifier ID | Verifier Proof ID | Aggregator ID |
 | ------ | ----------- | ----------------- | ------------- |
-| Risc0  | 0x3f836c01f54526864b30333d462b252ddfeb8458f13865da287daa9a62d1f963 | 0x3f836c01f54526864b30333d462b252ddfeb8458f13865da287daa9a62d1f963 | 0x7f15bdde5ebc6e3697df945e4a550e6e82df6dadc76a2862fa1825e6dbc2be1f |
-| SP1    | 0x00e874289e8c7f42381b6220f438801d2d1478dc8230f866a31e5ceec6e93322 | 0x4f143a748ed01f231e446c03d2018843e4c6a3689ae1c308ddb93c462233e946 | 0x002bb66c60302a81a621d7899e3f6ee1d0db9fb1eae5d1e80e94a33cb1e24922 |
+| Risc0  | 0x933285e8d3076b68cd7b59e611924a9aa2a0b836033213f5f6527b3fbd8897b4 | 0x933285e8d3076b68cd7b59e611924a9aa2a0b836033213f5f6527b3fbd8897b4 | 0x3b2a92fbc8ed23754da30eeaa6bfd72c6ee1ed7485a62d11c358092aa2ce91a7 |
+| SP1    | 0x00643c7149cf335e7ec9d3f3301e69658a7f0ef2bc7546509c257ed8809f28e1 | 0xa4381e329fd7cc73667e3a595896e6019577f8534219d571b1fd4a38e1289f00 | 0x00294928e44f0cdc9c74848c4cafcdb29f733a3bc07408c240be3d5afe750b3e |
 <!-- | Pico    | 0x009fa7467192bf60230f423dcc0b880ebebbffe955d7f75a8ac9bcbf5a58ba98 | 0x38a3d34f08d8af64b947e861eb80b8404affdf756add5f577e79931598ba585a | 0x00093dbf39d4986be382e062dcbf34d2bc8105637de89bdaaa588014a9c53e9b | -->
+
+> [!IMPORTANT]
+>
+> The program IDs above are derived from the ELFs committed under
+> `crates/{sp1,risc0}-methods/elf/` and only match a build that consumes
+> those ELFs reproducibly (`REPRODUCIBLE_BUILD` unset / `prebuilt` /
+> `docker`). A local non-reproducible build will produce different IDs
+> and the CLI will print a banner on startup. After regenerating ELFs,
+> run `nitro-attest-cli upload --out samples/<vm>_program_id.json [--sp1 | --risc0]`
+> to dump the fresh IDs.
 
 > [!NOTE]
 >
@@ -199,10 +209,17 @@ async fn prove_with_contract() -> anyhow::Result<()> {
 ### Prerequisites
 
 Ensure you have the following installed:
-- [Rust](https://rustup.rs/) (latest stable version)
+- [Rust](https://rustup.rs/) — the toolchain version is pinned by
+  `rust-toolchain.toml`, `rustup` will fetch it automatically.
 - [Foundry](https://getfoundry.sh/) for smart contract development
-- [RiscZero](https://dev.risczero.com/api/zkvm/install)
-- [Succinct](https://docs.succinct.xyz/docs/sp1/getting-started/install)
+- [RiscZero](https://dev.risczero.com/api/zkvm/install) — only needed to
+  rebuild the RISC0 ELFs locally (`REPRODUCIBLE_BUILD=disable …`); the
+  default `prebuilt` mode consumes the committed `risc0-*.elf` and works
+  with just Rust installed.
+- [Succinct](https://docs.succinct.xyz/docs/sp1/getting-started/install) —
+  same note as RiscZero, only needed for local SP1 ELF rebuilds.
+- [Docker](https://docs.docker.com/get-docker/) — only required for
+  `REPRODUCIBLE_BUILD=docker` (containerized reproducible rebuilds and CI).
 
 <details>
 <summary><b>1. Generate Zero-Knowledge Proofs</b></summary>
@@ -312,6 +329,37 @@ $ forge script script/NitroEnclaveVerifier.s.sol --rpc-url $RPC_URL --private-ke
 </details>
 
 ## Development
+
+### Reproducible ELF Builds
+
+The SP1 and RISC0 guest ELFs are committed under
+`crates/{sp1,risc0}-methods/elf/` so that downstream builds get the same
+program IDs as the deployed verifier contracts. The build mode is
+selected by the `REPRODUCIBLE_BUILD` environment variable, parsed at
+`build.rs` time:
+
+| Mode | When to use | Toolchain required |
+|------|-------------|--------------------|
+| `prebuilt` (unset / empty) | Default. Consumes the committed ELFs as-is. Fast, no zkVM toolchain needed. | Rust only |
+| `docker` | Reproducibly rebuild the ELFs inside a container and overwrite the committed copies. | Rust + Docker + `sp1up` / `rzup` |
+| anything else (e.g. `disable`) | Local non-reproducible rebuild for iteration; program IDs will drift. | Rust + `sp1up` / `rzup` |
+
+```bash
+# Default: use committed ELFs
+$ cargo build
+
+# Reproducibly rebuild inside Docker (this is what CI verifies)
+$ REPRODUCIBLE_BUILD=docker cargo build -p sp1-methods -p risc0-methods
+
+# Local iteration build (NOT reproducible)
+$ REPRODUCIBLE_BUILD=disable cargo build
+```
+
+When the binary is launched without a reproducible build, the CLI prints
+a stderr warning banner.
+
+A GitHub Actions workflow (`.github/workflows/verify-elf.yml`) rebuilds
+both ELFs in docker on every PR and fails if the committed binaries drift.
 
 ### Building Smart Contracts
 
@@ -447,11 +495,15 @@ missing BOUNDLESS_PRIVATE_KEY
 ```
 
 **Solution:**
-- For SP1 remote proving: Set `SP1_PRIVATE_KEY` environment variable with your SP1 network private key
+- For SP1 remote proving: Set `NETWORK_PRIVATE_KEY` environment variable with your SP1 network private key
 - For RISC0 remote proving via Boundless: Set the following environment variables:
-  - `BOUNDLESS_RPC_URL` - Boundless network RPC URL
-  - `BOUNDLESS_PRIVATE_KEY` - Your wallet private key (hex-encoded)
-  - [Storage Provider Configuration Environmental Variables](https://docs.boundless.network/developers/tutorials/request#storage-providers)
+  - `BOUNDLESS_RPC_URL` — Boundless network RPC URL
+  - `BOUNDLESS_PRIVATE_KEY` — Your wallet private key (hex-encoded)
+  - Exactly one storage uploader:
+    - `PINATA_JWT` (+ optional `PINATA_API_URL`, `IPFS_GATEWAY_URL`) for IPFS via Pinata, or
+    - `FILE_PATH` for the local-file uploader (useful for offline / dev setups)
+
+    See also the upstream [Boundless storage providers](https://docs.boundless.network/developers/tutorials/request#storage-providers) docs.
 - For local testing without remote proving: Set `DEV_MODE=true` to generate development proofs
 
 ```bash
@@ -461,7 +513,7 @@ export NETWORK_PRIVATE_KEY=your_sp1_network_private_key
 # For RISC0 production remote proving (via Boundless)
 export BOUNDLESS_RPC_URL=https://rpc.boundless.xyz
 export BOUNDLESS_PRIVATE_KEY=your_wallet_private_key
-# ... storage configuuration values
+export PINATA_JWT=your_pinata_jwt           # or FILE_PATH=/path/to/local/store
 
 # Optional Boundless configuration
 export BOUNDLESS_VERIFIER_PROGRAM_URL=ipfs://...   # Pre-uploaded verifier ELF URL

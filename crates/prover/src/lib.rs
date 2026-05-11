@@ -11,11 +11,15 @@ pub mod utils;
 pub mod program_sp1;
 #[cfg(feature = "sp1")]
 pub use program_sp1::{ProgramSP1, SP1ProverConfig};
+#[cfg(feature = "sp1")]
+pub use sp1_methods::SP1_REPRODUCIBLE_BUILD;
 
 #[cfg(feature = "risc0")]
 pub mod program_risc0;
 #[cfg(feature = "risc0")]
 pub use program_risc0::{ProgramRisc0, RiscZeroProverConfig};
+#[cfg(feature = "risc0")]
+pub use risc0_methods::RISC0_REPRODUCIBLE_BUILD;
 
 #[cfg(feature = "pico")]
 pub mod program_pico;

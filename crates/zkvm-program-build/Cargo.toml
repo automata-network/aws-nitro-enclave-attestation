@@ -1,0 +1,6 @@
+[package]
+name = "zkvm-program-build"
+version.workspace = true
+edition.workspace = true
+
+# No runtime or build dependencies — pure stdlib, build-time only helper.

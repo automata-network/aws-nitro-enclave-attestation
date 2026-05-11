@@ -24,7 +24,7 @@ impl AttestationReport {
         Ok(Self { doc, cose_sign })
     }
 
-    pub fn cert_chain(&self) -> anyhow::Result<CertChain> {
+    pub fn cert_chain(&self) -> anyhow::Result<CertChain<'_>> {
         let mut cert_chain = CertChain::new();
         for cert in &self.doc.cabundle {
             cert_chain.add_cert_by_der(cert)?;
@@ -43,7 +43,7 @@ impl AttestationReport {
         &self,
         trusted_certs_len: usize,
         timestamp: u64,
-    ) -> anyhow::Result<CertChain> {
+    ) -> anyhow::Result<CertChain<'_>> {
         let cert_chain = self.cert_chain()?;
         match cert_chain.verify_chain(trusted_certs_len) {
             Ok(true) => {}

@@ -9,6 +9,7 @@ members = [
     "crates/sp1-methods",
     "crates/pico-methods",
     "crates/utils",
+    "crates/zkvm-program-build",
 ]
 default-members = [
     "crates/nitro-attest-cli",
@@ -28,6 +29,7 @@ license = "Apache-2.0"
 # Always optimize; building and running the guest takes much longer without optimization.
 [profile.dev]
 opt-level = 3
+debug = 1
 
 [profile.release]
 debug = 1
@@ -52,10 +54,10 @@ serde_with = { version = "1.9.4", default-features = false }
 serde_bytes = "0.11"
 
 risc0-zkvm = { version = "^3.0.3", default-features = false }
-boundless-market = "1.1.0"
+boundless-market = "1.4.0"
 risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", tag = "v3.0.1" }
 
-sp1-sdk = { version = "^5.0.0", default-features = false, features = ["network"] }
+sp1-sdk = { version = "^6.1.0", default-features = false, features = ["network", "blocking"] }
 
 pico-sdk = { git = "https://github.com/automata-network/pico.git", branch = "evm_defer_proof" }
 pico-vm = { git = "https://github.com/automata-network/pico.git", branch = "evm_defer_proof" }

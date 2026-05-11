@@ -9,6 +9,7 @@ risc0-zkvm = { workspace = true }
 
 [build-dependencies]
 risc0-build = { version = "^3.0.3" }
+zkvm-program-build = { path = "../zkvm-program-build" }
 
 [package.metadata.risc0]
 methods = ["risc0-verifier", "risc0-aggregator"]

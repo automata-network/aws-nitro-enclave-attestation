@@ -64,6 +64,43 @@ enum Commands {
     ProgramId(program_id::ProgramIdCli),
 }
 
+/// Returns true if every active zkVM's embedded ELFs were built reproducibly.
+/// Any false flips the whole binary's state; an aggregated banner is shown once.
+fn check_reproducible_build() -> bool {
+    #[allow(unused_mut)]
+    let mut reproducible = true;
+
+    #[cfg(feature = "sp1")]
+    {
+        reproducible &= aws_nitro_enclave_attestation_prover::SP1_REPRODUCIBLE_BUILD;
+    }
+    #[cfg(feature = "risc0")]
+    {
+        reproducible &= aws_nitro_enclave_attestation_prover::RISC0_REPRODUCIBLE_BUILD;
+    }
+
+    reproducible
+}
+
+/// Prints a multi-line warning banner to stderr. Uses stderr (not tracing) so
+/// it cannot be silenced by `RUST_LOG=...` filters.
+fn print_non_reproducible_warning_banner() {
+    let lines = [
+        "================================================================",
+        "  WARNING: This binary was built WITHOUT reproducible build.",
+        "",
+        "  ZK program IDs may differ from the official release.",
+        "  DO NOT use this binary to generate production proofs.",
+        "",
+        "  To enable reproducible build, unset REPRODUCIBLE_BUILD",
+        "  (or set REPRODUCIBLE_BUILD=1) and rebuild.",
+        "================================================================",
+    ];
+    for line in lines {
+        eprintln!("{line}");
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     // Load environment variables from .env file if present
     dotenvy::dotenv().ok();
@@ -75,6 +112,10 @@ fn main() -> anyhow::Result<()> {
                 .from_env_lossy(),
         )
         .init();
+
+    if !check_reproducible_build() {
+        print_non_reproducible_warning_banner();
+    }
 
     let cli = NitroAttestCli::parse();
     match &cli.command {

@@ -9,7 +9,7 @@ license.workspace = true
 default = ["risc0", "sp1"]
 sp1 = ["dep:sp1-sdk", "dep:sp1-methods"]
 risc0 = ["dep:risc0-zkvm", "dep:risc0-methods", "dep:boundless-market", "dep:risc0-ethereum-contracts"]
-pico = ["dep:pico-sdk", "dep:pico-vm", "dep:pico-methods", "dep:p3-field"]
+pico = ["dep:pico-sdk", "dep:pico-vm", "dep:pico-methods", "dep:pico-p3-field"]
 
 [dependencies]
 anyhow.workspace = true
@@ -23,7 +23,7 @@ sp1-sdk = { workspace = true, optional = true }
 pico-methods = { workspace = true, optional = true }
 pico-sdk = { workspace = true, optional = true }
 pico-vm = { workspace = true, optional = true }
-p3-field = { git = "https://github.com/brevis-network/Plonky3.git", rev = "a4d376b", optional = true }
+pico-p3-field = { git = "https://github.com/brevis-network/Plonky3.git", rev = "a4d376b", optional = true, package = "p3-field" }
 alloy-primitives.workspace = true
 boundless-market = { workspace = true, optional = true }
 tokio.workspace = true
