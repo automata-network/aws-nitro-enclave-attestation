@@ -8,12 +8,12 @@ use aws_nitro_enclave_attestation_verifier::stub::{
 };
 use lazy_static::lazy_static;
 use sp1_methods::{
-    ENV_PROVER, SP1_AGGREGATOR_ELF, SP1_AGGREGATOR_PK, SP1_AGGREGATOR_VK, SP1_VERIFIER_ELF,
-    SP1_VERIFIER_PK, SP1_VERIFIER_VK,
+    ENV_PROVER, SP1_AGGREGATOR_ELF, SP1_AGGREGATOR_PK, SP1_VERIFIER_ELF, SP1_VERIFIER_PK,
 };
 use sp1_sdk::{
-    network::builder::NetworkProverBuilder, HashableKey, SP1Proof, SP1ProvingKey, SP1Stdin,
-    SP1VerifyingKey, SP1_CIRCUIT_VERSION,
+    blocking::{EnvProvingKey, ProveRequest, Prover},
+    network::builder::NetworkProverBuilder,
+    HashableKey, ProvingKey, SP1Proof, SP1Stdin, SP1VerifyingKey, SP1_CIRCUIT_VERSION,
 };
 
 use crate::{
@@ -51,31 +51,29 @@ impl TryFrom<SP1ProverConfig> for RemoteProverConfig {
 
 lazy_static! {
     pub static ref SP1_PROGRAM_VERIFIER: ProgramSP1<VerifierInput, VerifierJournal> =
-        ProgramSP1::new(SP1_VERIFIER_ELF, &SP1_VERIFIER_VK, &SP1_VERIFIER_PK);
+        ProgramSP1::new(&SP1_VERIFIER_ELF, &SP1_VERIFIER_PK);
     pub static ref SP1_PROGRAM_AGGREGATOR: ProgramSP1<BatchVerifierJournal, BatchVerifierJournal> =
-        ProgramSP1::new(SP1_AGGREGATOR_ELF, &SP1_AGGREGATOR_VK, &SP1_AGGREGATOR_PK);
+        ProgramSP1::new(&SP1_AGGREGATOR_ELF, &SP1_AGGREGATOR_PK);
 }
 
 #[derive(Clone)]
 pub struct ProgramSP1<Input, Output> {
-    vk: &'static SP1VerifyingKey,
-    pk: &'static SP1ProvingKey,
+    pk: &'static EnvProvingKey,
     elf: &'static [u8],
     _marker: PhantomData<(Input, Output)>,
 }
 
 impl<Input, Output> ProgramSP1<Input, Output> {
-    pub fn new(
-        elf: &'static [u8],
-        vk: &'static SP1VerifyingKey,
-        pk: &'static SP1ProvingKey,
-    ) -> Self {
+    pub fn new(elf: &'static [u8], pk: &'static EnvProvingKey) -> Self {
         ProgramSP1 {
-            vk,
             pk,
             elf,
             _marker: PhantomData,
         }
+    }
+
+    fn vk(&self) -> &SP1VerifyingKey {
+        self.pk.verifying_key()
     }
 
     fn gen_raw_proof(
@@ -83,7 +81,7 @@ impl<Input, Output> ProgramSP1<Input, Output> {
         stdin: SP1Stdin,
         raw_proof_type: RawProofType,
     ) -> anyhow::Result<RawProof> {
-        let prover = ENV_PROVER.prove(&self.pk, &stdin);
+        let prover = ENV_PROVER.prove(self.pk, stdin);
         let prover = match raw_proof_type {
             RawProofType::Composite => prover.compressed(),
             RawProofType::Groth16 => prover.groth16(),
@@ -91,7 +89,7 @@ impl<Input, Output> ProgramSP1<Input, Output> {
         let proof = prover.run()?;
 
         Ok(RawProof::from_proof(
-            &(proof.proof, self.vk),
+            &(proof.proof, self.vk().clone()),
             proof.public_values.to_vec().into(),
         )?)
     }
@@ -149,18 +147,18 @@ where
             if let Some(api_url) = &cfg.api_url {
                 builder = builder.rpc_url(&api_url);
             }
-            let prover = builder.build();
-            prover.register_program(&self.vk, self.elf).await?;
+            let prover = builder.build().await;
+            prover.register_program(self.vk(), self.elf).await?;
             Ok(())
         })
     }
 
     fn program_id(&self) -> B256 {
-        self.vk.bytes32_raw().into()
+        self.vk().bytes32_raw().into()
     }
 
     fn verify_proof_id(&self) -> B256 {
-        B256::new(unsafe { std::mem::transmute(self.vk.hash_u32()) })
+        B256::new(unsafe { std::mem::transmute(self.vk().hash_u32()) })
     }
 
     fn gen_proof(

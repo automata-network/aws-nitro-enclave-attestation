@@ -16,9 +16,10 @@ use boundless_market::{
     },
     client::Client as BoundlessClient,
     contracts::FulfillmentData,
+    price_oracle::{Amount, Asset},
     request_builder::OfferParams,
-    storage::storage_provider_from_env,
-    Deployment, StorageProvider,
+    storage::{StandardUploader, StorageUploader, StorageUploaderConfig, StorageUploaderType},
+    Deployment,
 };
 use lazy_static::lazy_static;
 use risc0_ethereum_contracts::{groth16, receipt::decode_seal_with_claim};
@@ -26,8 +27,8 @@ use risc0_methods::{
     RISC0_AGGREGATOR_ELF, RISC0_AGGREGATOR_ID, RISC0_VERIFIER_ELF, RISC0_VERIFIER_ID,
 };
 use risc0_zkvm::{
-    default_prover, Digest, ExecutorEnv, InnerReceipt, Receipt, ReceiptClaim, VERSION,
-    compute_image_id,
+    compute_image_id, default_prover, Digest, ExecutorEnv, InnerReceipt, ProverOpts, Receipt,
+    ReceiptClaim, VERSION,
 };
 use serde::Serialize;
 
@@ -152,6 +153,43 @@ struct AggregatorInput {
     receipts: Vec<Receipt>,
 }
 
+/// Construct a [`StorageUploaderConfig`] from environment variables.
+///
+/// Mirrors the behavior of boundless 1.x's `storage_provider_from_env` against the
+/// 1.4 builder API. Supports the providers available without optional cargo features
+/// (Pinata via `PINATA_JWT`, plus a local file fallback via `FILE_PATH`).
+fn storage_uploader_config_from_env() -> anyhow::Result<StorageUploaderConfig> {
+    let mut builder = StorageUploaderConfig::builder();
+
+    if let Ok(jwt) = std::env::var("PINATA_JWT") {
+        builder
+            .storage_uploader(StorageUploaderType::Pinata)
+            .pinata_jwt(jwt);
+        if let Ok(api_url) = std::env::var("PINATA_API_URL") {
+            builder.pinata_api_url(
+                Url::parse(&api_url).context("Invalid PINATA_API_URL")?,
+            );
+        }
+        if let Ok(gw_url) = std::env::var("IPFS_GATEWAY_URL") {
+            builder.ipfs_gateway_url(
+                Url::parse(&gw_url).context("Invalid IPFS_GATEWAY_URL")?,
+            );
+        }
+    } else if let Ok(path) = std::env::var("FILE_PATH") {
+        builder
+            .storage_uploader(StorageUploaderType::File)
+            .file_path(std::path::PathBuf::from(path));
+    } else {
+        return Err(anyhow!(
+            "no storage uploader configured (set PINATA_JWT for Pinata or FILE_PATH for local file storage)"
+        ));
+    }
+
+    builder
+        .build()
+        .map_err(|e| anyhow!("failed to build storage uploader config: {e}"))
+}
+
 #[derive(Clone)]
 pub struct ProgramRisc0<Input, Output> {
     elf: &'static [u8],
@@ -205,18 +243,22 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
         let private_key = PrivateKeySigner::from_slice(&private_key_bytes)
             .context("Failed to parse private key")?;
 
-        let storage_provider = storage_provider_from_env()
-            .context("Failed to get storage provider (check PINATA_JWT env var)")?;
+        let storage_config = storage_uploader_config_from_env()?;
+
+        let max_price_per_cycle = Amount::new(cfg.effective_max_price(), Asset::ETH);
+        let min_price_per_cycle = Amount::new(cfg.effective_min_price(), Asset::ETH);
 
         let client = BoundlessClient::builder()
             .with_rpc_url(rpc_url_parsed)
             .with_deployment(deployment)
-            .with_storage_provider(Some(storage_provider))
+            .with_uploader_config(&storage_config)
+            .await
+            .context("Failed to configure Boundless storage uploader")?
             .with_private_key(private_key)
             .config_offer_layer(|config| {
                 config
-                    .max_price_per_cycle(cfg.effective_max_price())
-                    .min_price_per_cycle(cfg.effective_min_price())
+                    .max_price_per_cycle(max_price_per_cycle.clone())
+                    .min_price_per_cycle(min_price_per_cycle.clone())
             })
             .build()
             .await
@@ -251,10 +293,10 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
         // Configure offer params
         let mut offer_builder = OfferParams::builder();
         if let Some(min_price) = cfg.min_price {
-            offer_builder.min_price(U256::from(min_price));
+            offer_builder.min_price(Amount::new(U256::from(min_price), Asset::ETH));
         }
         if let Some(max_price) = cfg.max_price {
-            offer_builder.max_price(U256::from(max_price));
+            offer_builder.max_price(Amount::new(U256::from(max_price), Asset::ETH));
         }
         if let Some((lock_timeout, timeout)) = cfg.effective_timeout() {
             offer_builder.lock_timeout(lock_timeout);
@@ -263,7 +305,7 @@ impl<Input, Output> ProgramRisc0<Input, Output> {
         if let Some(ramp_up_period) = cfg.ramp_up_period {
             offer_builder.ramp_up_period(ramp_up_period);
         }
-        offer_builder.lock_collateral(cfg.effective_collateral());
+        offer_builder.lock_collateral(Amount::new(cfg.effective_collateral(), Asset::ZKC));
         request_builder = request_builder.with_offer(offer_builder);
 
         tracing::debug!("Boundless request: {:?}", &request_builder);
@@ -555,13 +597,15 @@ where
 
     fn upload_image(&self, _cfg: &RemoteProverConfig) -> anyhow::Result<()> {
         block_on(async {
-            let storage_provider = storage_provider_from_env()
-                .context("Failed to get storage provider (check PINATA_JWT env var)")?;
-
-            let elf_url = storage_provider
-                .upload_input(self.elf)
+            let storage_config = storage_uploader_config_from_env()?;
+            let uploader = StandardUploader::from_config(&storage_config)
                 .await
-                .context("Failed to upload ELF to Pinata/IPFS")?;
+                .context("Failed to construct storage uploader")?;
+
+            let elf_url = uploader
+                .upload_program(self.elf)
+                .await
+                .context("Failed to upload ELF to storage uploader")?;
 
             tracing::info!(
                 "Uploaded image {} to storage: {}",

@@ -8,4 +8,5 @@ sp1-sdk.workspace = true
 lazy_static.workspace = true
 
 [build-dependencies]
-sp1-build = "^5.0.0"
+sp1-build = "^6.1.0"
+zkvm-program-build = { path = "../zkvm-program-build" }

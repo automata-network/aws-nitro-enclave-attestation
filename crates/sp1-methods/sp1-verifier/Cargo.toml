@@ -8,5 +8,5 @@ license = "Apache-2.0"
 [workspace]
 
 [dependencies]
-sp1-zkvm = "^5.0.0"
+sp1-zkvm = "^6.1.0"
 aws-nitro-enclave-attestation-verifier = { path = "../../verifier", features = ["sp1"] }

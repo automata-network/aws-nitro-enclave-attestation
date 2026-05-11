@@ -1,0 +1,71 @@
+name: Verify reproducible ELF
+
+on:
+  pull_request:
+    paths:
+      - 'crates/sp1-methods/**'
+      - 'crates/risc0-methods/**'
+      - 'crates/zkvm-program-build/**'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/verify-elf.yml'
+  push:
+    branches: [main]
+
+jobs:
+  sp1:
+    name: SP1 reproducibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain from rust-toolchain.toml
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - name: Install SP1 toolchain (sp1up)
+        run: |
+          curl -L https://sp1up.succinct.xyz | bash
+          ~/.sp1/bin/sp1up
+          echo "$HOME/.sp1/bin" >> "$GITHUB_PATH"
+
+      - name: Confirm docker is available
+        run: docker version
+
+      - name: Rebuild SP1 ELFs reproducibly
+        run: REPRODUCIBLE_BUILD=docker cargo build -p sp1-methods
+
+      - name: Verify no drift in committed ELFs
+        run: |
+          if ! git diff --exit-code crates/sp1-methods/elf/; then
+            echo "::error::Committed SP1 ELF does not match a reproducible rebuild."
+            echo "Run 'REPRODUCIBLE_BUILD=docker cargo build -p sp1-methods' locally and commit the result."
+            exit 1
+          fi
+
+  risc0:
+    name: RISC0 reproducibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain from rust-toolchain.toml
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - name: Install RISC0 toolchain (rzup)
+        run: |
+          curl -L https://risczero.com/install | bash
+          echo "$HOME/.risc0/bin" >> "$GITHUB_PATH"
+          ~/.risc0/bin/rzup install
+
+      - name: Confirm docker is available
+        run: docker version
+
+      - name: Rebuild RISC0 ELFs reproducibly
+        run: REPRODUCIBLE_BUILD=docker cargo build -p risc0-methods
+
+      - name: Verify no drift in committed ELFs
+        run: |
+          if ! git diff --exit-code crates/risc0-methods/elf/; then
+            echo "::error::Committed RISC0 ELF does not match a reproducible rebuild."
+            echo "Run 'REPRODUCIBLE_BUILD=docker cargo build -p risc0-methods' locally and commit the result."
+            exit 1
+          fi

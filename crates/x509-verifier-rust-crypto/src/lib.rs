@@ -19,7 +19,7 @@ pub use p256;
 #[cfg(all(feature = "risc0_unstable", not(feature = "sp1")))]
 pub extern crate rsa_risc0 as rsa;
 #[cfg(feature = "sp1")]
-pub extern crate rsa_sp1 as rsa;
+pub use rsa; // fallback
 #[cfg(all(not(feature = "sp1"), not(feature = "risc0_unstable")))]
 pub use rsa;
 
