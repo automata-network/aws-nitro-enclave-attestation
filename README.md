@@ -356,9 +356,7 @@ $ REPRODUCIBLE_BUILD=disable cargo build
 ```
 
 When the binary is launched without a reproducible build, the CLI prints
-a stderr warning banner and `SP1_REPRODUCIBLE_BUILD` /
-`RISC0_REPRODUCIBLE_BUILD` are exposed as `const bool` from the prover
-crate for programmatic checks.
+a stderr warning banner.
 
 A GitHub Actions workflow (`.github/workflows/verify-elf.yml`) rebuilds
 both ELFs in docker on every PR and fails if the committed binaries drift.
