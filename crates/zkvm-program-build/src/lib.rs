@@ -124,7 +124,25 @@ impl<B: ZkVmBackend> ProgramBuild<B> {
                     }
                     p
                 }
-                BuildMode::Docker => B::build_one(target, &ws_root, true, Some(&elf_dir)),
+                BuildMode::Docker => {
+                    let p = B::build_one(target, &ws_root, true, Some(&elf_dir));
+                    // Normalize permission to 0755. Some host filesystems (notably
+                    // virtiofs-shared workspaces under macOS-hosted Linux VMs) strip
+                    // the executable bit when files are written from inside the
+                    // docker container, so the freshly produced ELF lands at 0644
+                    // locally while CI on native ext4 keeps it at 0755 — making the
+                    // committed ELF's mode depend on who built it. Force a single
+                    // mode here so the index entry is stable across environments.
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755))
+                            .unwrap_or_else(|e| {
+                                panic!("Failed to chmod 0755 on {}: {e}", p.display())
+                            });
+                    }
+                    p
+                }
                 BuildMode::Local => B::build_one(target, &ws_root, false, None),
             };
             wired.push((target, path));
