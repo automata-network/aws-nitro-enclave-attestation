@@ -103,8 +103,8 @@ Test deployment without broadcasting transactions:
 
 For each chain, the deployment script will:
 
-1. **Check for existing verifiers**: Uses official SP1 and RISC0 verifier addresses if available
-2. **Deploy verifiers if needed**: Deploys new verifiers if not using official ones
+1. **Check for existing verifiers**: Uses official SP1 Gateway and RISC0 verifier addresses if available
+2. **Deploy verifiers if needed**: Deploys new verifiers if not using official ones. The SP1 fallback deploys the bundled v6.1.0 Groth16 verifier.
 3. **Deploy NitroEnclaveVerifier**: Deploys the main attestation verifier contract
 4. **Set root certificate**: Configures the AWS Nitro root certificate
 5. **Configure ZK verifiers**: Sets up SP1 and RISC0 program IDs and verifier addresses

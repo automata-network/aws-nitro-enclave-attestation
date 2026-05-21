@@ -297,8 +297,9 @@ $ cd contracts
 $ forge script script/NitroEnclaveVerifier.s.sol --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast --sig 'deployVerifier()'
 
 # Deploy the SP1Verifier
-# If you want to use the official pre-deployed contract, please refer to https://github.com/succinctlabs/sp1-contracts/blob/main/contracts/deployments/
+# If you want to use the official pre-deployed gateway, please refer to https://github.com/succinctlabs/sp1-contracts/blob/main/contracts/deployments/
 # and export SP1_VERIFIER=$sp1VerifierAddr
+# Otherwise, deploySP1Verifier() deploys the bundled SP1 v6.1.0 Groth16 verifier.
 $ forge script script/NitroEnclaveVerifier.s.sol --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast --sig 'deploySP1Verifier()'
 
 # Deploy the Risc0Verifier
