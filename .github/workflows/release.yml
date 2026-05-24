@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - '*'
+
+jobs:
+  build-and-release:
+    name: Build and publish release when tag points to main
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tag points to origin/main
+        shell: bash
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo "Tag: $TAG"
+          # Fetch main so we can check whether the tagged commit is contained in it
+          git fetch origin main --depth=1 || true
+          if git branch --remotes --contains "${GITHUB_SHA}" | grep -q "origin/main"; then
+            echo "Tag ${TAG} points to a commit on origin/main — continuing."
+          else
+            echo "Tag ${TAG} does not point to a commit on origin/main — skipping release." 
+            exit 0
+          fi
+
+      - name: Set up Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install RISC0 toolchain (rzup)
+        shell: bash
+        run: |
+          curl -L https://risczero.com/install | bash
+          export PATH="$HOME/.risc0/bin:$PATH"
+          rzup install rust
+          echo "$HOME/.risc0/bin" >> $GITHUB_PATH
+          echo "$HOME/.risc0/cargo/bin" >> $GITHUB_PATH
+
+      - name: Install SP1 toolchain (sp1up)
+        shell: bash
+        run: |
+          curl -L https://sp1up.succinct.xyz | bash
+          export PATH="$HOME/.sp1/bin:$PATH"
+          sp1up
+          echo "$HOME/.sp1/bin" >> $GITHUB_PATH
+
+      - name: Build workspace (release)
+        env:
+          RUSTUP_TOOLCHAIN: stable
+        run: |
+          cargo build --workspace --release
+
+      - name: Prepare release artifact
+        run: |
+          BIN=nitro-attest-cli
+          ART="${BIN}-${{ github.ref_name }}.tar.gz"
+          mkdir -p release
+          tar -C target/release -czf release/${ART} ${BIN} || (echo "Binary ${BIN} not found in target/release" && ls -la target/release && exit 1)
+          ls -lh release
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/nitro-attest-cli-${{ github.ref_name }}.tar.gz
+          body: "Automated release for ${{ github.ref_name }}"
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
